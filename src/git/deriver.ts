@@ -53,31 +53,31 @@ export class ContentDeriver {
     /**
      * Generates a derived filename.
      */
-    deriveFilename(index: number, ext: string = '.ts'): string {
+    deriveFilename(index: number, ext: string = '.ts', rng: SeededRng = this.rng): string {
         const prefixes = ['feature', 'util', 'helper', 'service', 'component', 'module'];
         const suffixes = ['handler', 'manager', 'processor', 'factory', 'builder', 'validator'];
-        const prefix = this.rng.pick(prefixes);
-        const suffix = this.rng.pick(suffixes);
+        const prefix = rng.pick(prefixes);
+        const suffix = rng.pick(suffixes);
         return `${prefix}-${suffix}-${index}${ext}`;
     }
 
     /**
      * Generates derived content (safe mutations of fixture snippets).
      */
-    deriveContent(index: number): string {
+    deriveContent(index: number, rng: SeededRng = this.rng): string {
         // If we have fixtures, sample and mutate
         if (this.fixtures.length > 0) {
-            const sample = this.rng.pick(this.fixtures);
-            return this.mutate(sample.content, index);
+            const sample = rng.pick(this.fixtures);
+            return this.mutate(sample.content, index, rng);
         }
         // Fallback: generate minimal synthetic content
-        return this.generateSyntheticContent(index);
+        return this.generateSyntheticContent(index, rng);
     }
 
     /**
      * Applies safe mutations: comment changes, string literals, identifier renames.
      */
-    private mutate(content: string, index: number): string {
+    private mutate(content: string, index: number, rng: SeededRng): string {
         let result = content;
 
         // Mutate comments (safe)
@@ -88,17 +88,17 @@ export class ContentDeriver {
                 `// Refactored logic`,
                 `// Enhanced version`,
             ];
-            return this.rng.pick(comments);
+            return rng.pick(comments);
         });
 
         // Mutate string literals (safe)
         result = result.replace(/"[^"]{1,20}"/g, () => {
             const strings = [
                 `"value-${index}"`,
-                `"data-${this.rng.int(100, 999)}"`,
+                `"data-${rng.int(100, 999)}"`,
                 `"item-${Date.now() % 10000}"`,
             ];
-            return this.rng.pick(strings);
+            return rng.pick(strings);
         });
 
         // Truncate if too long
@@ -113,20 +113,20 @@ export class ContentDeriver {
     /**
      * Generates minimal synthetic content when no fixtures available.
      */
-    private generateSyntheticContent(index: number): string {
+    private generateSyntheticContent(index: number, rng: SeededRng): string {
         const functionNames = ['process', 'handle', 'validate', 'transform', 'calculate'];
-        const funcName = this.rng.pick(functionNames);
+        const funcName = rng.pick(functionNames);
 
         return `// Auto-generated for seeding (run index: ${index})
 export function ${funcName}Data(input: unknown): unknown {
-  // Implementation ${this.rng.int(1, 100)}
+  // Implementation ${rng.int(1, 100)}
   return input;
 }
 
 export const CONFIG_${index} = {
-  enabled: ${this.rng.random() > 0.5},
-  threshold: ${this.rng.int(1, 100)},
-  mode: "${this.rng.pick(['fast', 'balanced', 'thorough'])}",
+  enabled: ${rng.random() > 0.5},
+  threshold: ${rng.int(1, 100)},
+  mode: "${rng.pick(['fast', 'balanced', 'thorough'])}",
 };
 `;
     }
@@ -134,12 +134,12 @@ export const CONFIG_${index} = {
     /**
      * Generates a complete file set for a branch.
      */
-    generateFileSet(count: number): Array<{ name: string; content: string }> {
+    generateFileSet(count: number, rng: SeededRng = this.rng): Array<{ name: string; content: string }> {
         const files: Array<{ name: string; content: string }> = [];
         for (let i = 0; i < count; i++) {
             files.push({
-                name: this.deriveFilename(i),
-                content: this.deriveContent(i),
+                name: this.deriveFilename(i, '.ts', rng),
+                content: this.deriveContent(i, rng),
             });
         }
         return files;

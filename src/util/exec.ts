@@ -22,7 +22,15 @@ export async function exec(
     const { cwd, env, patsToRedact = [] } = options;
 
     return new Promise((resolve, reject) => {
-        const proc = spawn(command, args, {
+        // Quote arguments with spaces for shell execution (especially important on Windows)
+        const escapedArgs = args.map(arg => {
+            if (arg === '' || arg.includes(' ') || arg.includes('\t') || arg.includes('\n')) {
+                return `"${arg.replaceAll('"', '\\"')}"`;
+            }
+            return arg;
+        });
+
+        const proc = spawn(command, escapedArgs, {
             cwd,
             env: { ...process.env, ...env, GIT_TERMINAL_PROMPT: '0' },
             shell: true,

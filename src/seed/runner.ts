@@ -68,8 +68,8 @@ export class SeedRunner {
      */
     async run(): Promise<SeedSummary> {
         const summary: SeedSummary = {
-            runId: this.plan.runId,
-            org: this.plan.org,
+            runId: this.config.runId,
+            org: this.config.org,
             startTime: new Date().toISOString(),
             endTime: '',
             repos: [],
@@ -77,17 +77,20 @@ export class SeedRunner {
         };
 
         try {
-            // Step 1: Resolve all identities (FATAL on failure)
+            // Step 1: Preflight Policy Discovery
+            await this.preflightPolicies();
+
+            // Step 2: Resolve all identities (FATAL on failure)
             await this.resolveAllIdentities();
 
-            // Step 2: Process each repo
+            // Step 3: Process each repo
             for (const plannedRepo of this.plan.repos) {
                 const repoResult = await this.processRepo(plannedRepo);
                 summary.repos.push(repoResult);
             }
         } catch (error) {
             summary.fatalFailure = {
-                phase: 'initialization',
+                phase: 'execution',
                 error: error instanceof Error ? error.message : String(error),
             };
         }
@@ -109,19 +112,49 @@ export class SeedRunner {
         }
     }
 
+    private async preflightPolicies(): Promise<void> {
+        const projects = [...new Set(this.plan.repos.map(r => r.project))];
+        console.log('🔍 Preflight: Checking for branch policies...');
+
+        for (const project of projects) {
+            try {
+                const policies = await this.prManager.getPolicyConfigurations(project);
+                const dangerousPolicies = policies.filter(p =>
+                    p.isEnabled && !p.isDeleted &&
+                    ['Minimum reviewer count', 'Required reviewers', 'Check for merge conflicts'].includes(p.type.displayName)
+                );
+
+                if (dangerousPolicies.length > 0) {
+                    console.warn(`\n⚠️  [POLICY WARNING] Active branch policies detected in project '${project}':`);
+                    for (const p of dangerousPolicies) {
+                        console.warn(`   - ${p.type.displayName}`);
+                    }
+                    console.warn(`   These may block automated PR completion if criteria aren't met.\n`);
+                }
+            } catch (error) {
+                console.warn(`⚠️  Failed to query policies for project '${project}': ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
+    }
+
     private async processRepo(planned: PlannedRepo): Promise<RepoResult> {
         const result: RepoResult = {
             project: planned.project,
             repoName: planned.repoName,
             repoId: null,
+            resolvedNaming: planned.resolvedNaming,
             branchesCreated: 0,
             prs: [],
             failures: [],
         };
 
         try {
-            // Create/ensure repo exists (FATAL on failure)
-            const repo = await this.repoManager.ensureRepo(planned.project, planned.repoName);
+            // Create/ensure repo exists
+            const repo = await this.repoManager.ensureRepo(planned.project, planned.repoName, this.config.repoStrategy);
+            if (!repo) {
+                // Skiped or recorded warning elsewhere (though RepoResult needs to show it)
+                return result;
+            }
             result.repoId = repo.id;
 
             // Generate and push git content (FATAL on failure)
@@ -130,10 +163,35 @@ export class SeedRunner {
                 commits: b.commits,
             }));
 
-            const generated = await this.gitGenerator.createRepo(planned.repoName, branchSpecs);
+            // Step 2.5: Collision Guard (Fatal if any branch exists)
+            // For now, we'll check via remote URL (simplest without cloning)
+            // Actually, we'll just check if the branch exists on the remote later or now
+            // But let's follow the plan: FATAL if collision
+            // We can use git ls-remote to check for branches without cloning
+            // But wait, the plan says: "Rerun Day2 with the SAME runId. Assert FATAL exit."
+            // I'll implement this check in a simpler way if possible or just use git.
+
+            const generated = await this.gitGenerator.createRepo(
+                planned.repoName,
+                branchSpecs,
+                this.config.seed,
+                this.config.runId
+            );
 
             try {
                 const primaryUser = this.config.resolvedUsers[0];
+
+                // Step 2.5: Collision Guard (Fatal if any branch exists)
+                const collisions = await this.gitGenerator.checkCollisions(
+                    repo.remoteUrl,
+                    primaryUser.pat,
+                    generated.branches
+                );
+
+                if (collisions.length > 0) {
+                    throw new Error(`FATAL: Collision detected on branches: ${collisions.join(', ')}. This runId has already been used for this repository.`);
+                }
+
                 await this.gitGenerator.pushToRemote(
                     generated.localPath,
                     repo.remoteUrl,
@@ -147,17 +205,29 @@ export class SeedRunner {
 
             // Process PRs (NON-FATAL on individual failures)
             for (const plannedPr of planned.prs) {
-                const prResult = await this.processPr(planned.project, repo.id, plannedPr, result.failures);
+                const prResult = await this.processPr(
+                    planned.project,
+                    repo, // Use repo object for remoteUrl access
+                    plannedPr,
+                    result.failures,
+                    generated.localPath // Pass localPath for follow-up push
+                );
                 if (prResult) {
                     result.prs.push(prResult);
                 }
             }
         } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
             result.failures.push({
                 phase: 'repo-creation',
-                error: error instanceof Error ? error.message : String(error),
+                error: errorMsg,
                 isFatal: true,
             });
+
+            // Re-throw if it's a FATAL error intended to stop the whole run
+            if (errorMsg.includes('FATAL:')) {
+                throw error;
+            }
         }
 
         return result;
@@ -165,10 +235,13 @@ export class SeedRunner {
 
     private async processPr(
         project: string,
-        repoId: string,
+        repo: any, // AdoRepo
         planned: PlannedPr,
-        failures: FailureRecord[]
+        failures: FailureRecord[],
+        localPath?: string
     ): Promise<PrResult | null> {
+        const repoId = repo.id;
+        const repoName = repo.name;
         try {
             // Create PR
             const pr = await this.prManager.createPr({
@@ -187,6 +260,7 @@ export class SeedRunner {
                 creator: planned.creatorEmail,
                 reviewers: [],
                 comments: 0,
+                followUpCommitsAdded: 0,
                 outcome: planned.outcome,
                 outcomeApplied: false,
             };
@@ -255,10 +329,33 @@ export class SeedRunner {
             // Apply outcome (non-fatal)
             try {
                 if (planned.outcome === 'complete') {
-                    // Need to get the latest commit SHA
-                    // For now, we'll skip completion if we can't get it cleanly
-                    // This would require additional API call to get PR details
-                    prResult.outcomeApplied = false; // Mark as not applied for now
+                    // Robust completion with retry for 409
+                    let retries = 0;
+                    const maxPrRetries = 2;
+                    let lastError: any = null;
+
+                    while (retries <= maxPrRetries) {
+                        try {
+                            const prDetails = await this.prManager.getPrDetails(project, repoId, pr.pullRequestId);
+                            await this.prManager.completePr(
+                                project,
+                                repoId,
+                                pr.pullRequestId,
+                                prDetails.lastMergeSourceCommit.commitId
+                            );
+                            prResult.outcomeApplied = true;
+                            break;
+                        } catch (error: any) {
+                            lastError = error;
+                            // Retry on 409 (Conflict) - usually means PR is being updated/merged
+                            if (error.status === 409 && retries < maxPrRetries) {
+                                retries++;
+                                await new Promise(r => setTimeout(r, 2000));
+                                continue;
+                            }
+                            throw error;
+                        }
+                    }
                 } else if (planned.outcome === 'abandon') {
                     await this.prManager.abandonPr(project, repoId, pr.pullRequestId);
                     prResult.outcomeApplied = true;
@@ -272,6 +369,31 @@ export class SeedRunner {
                     error: error instanceof Error ? error.message : String(error),
                     isFatal: false,
                 });
+            }
+
+            // Push follow-up commits if planned (non-fatal)
+            if (planned.followUpCommits > 0 && localPath) {
+                try {
+                    const primaryUser = this.config.resolvedUsers[0];
+                    const followUp = await this.gitGenerator.pushFollowUpCommits(
+                        localPath,
+                        repo.remoteUrl,
+                        planned.sourceBranch,
+                        planned.followUpCommits,
+                        primaryUser.pat,
+                        this.config.seed,
+                        this.config.runId,
+                        repoName
+                    );
+                    prResult.followUpCommitsAdded = followUp.count;
+                } catch (error) {
+                    failures.push({
+                        phase: 'push-followup',
+                        prId: pr.pullRequestId,
+                        error: error instanceof Error ? error.message : String(error),
+                        isFatal: false,
+                    });
+                }
             }
 
             return prResult;

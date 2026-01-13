@@ -3,6 +3,7 @@ import { loadConfig, redactPat } from './config.js';
 import { writeFileSync, unlinkSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { resolveRepoConfig } from './config.js';
 
 describe('config', () => {
     describe('loadConfig()', () => {
@@ -122,10 +123,54 @@ describe('config', () => {
             try {
                 const loaded = loadConfig(configPath, 'my-custom-run-id');
                 expect(loaded.runId).toBe('my-custom-run-id');
+                // Check new defaults
+                expect(loaded.repoNaming).toBe('isolated');
+                expect(loaded.repoStrategy.createIfMissing).toBe(true);
             } finally {
                 delete process.env.CUSTOM_RUN_PAT;
                 unlinkSync(configPath);
             }
+        });
+    });
+
+    describe('resolveRepoConfig()', () => {
+        const mockConfig: any = {
+            repoNaming: 'isolated',
+            repoStrategy: { createIfMissing: true, failIfMissing: false, skipIfExists: false },
+        };
+
+        const mockProject: any = {
+            name: 'p1',
+        };
+
+        it('resolves string repo to isolated naming by default', () => {
+            const resolved = resolveRepoConfig(mockConfig, mockProject, 'repoA');
+            expect(resolved.name).toBe('repoA');
+            expect(resolved.repoNaming).toBe('isolated');
+        });
+
+        it('resolves complex repo with overrides', () => {
+            const resolved = resolveRepoConfig(mockConfig, mockProject, {
+                name: 'repoB',
+                repoNaming: 'direct',
+            });
+            expect(resolved.name).toBe('repoB');
+            expect(resolved.repoNaming).toBe('direct');
+        });
+
+        it('prefers project-level overrides over global', () => {
+            const projectWithOverride = { ...mockProject, repoNaming: 'direct' };
+            const resolved = resolveRepoConfig(mockConfig, projectWithOverride, 'repoC');
+            expect(resolved.repoNaming).toBe('direct');
+        });
+
+        it('prefers repo-level overrides over project-level', () => {
+            const projectWithOverride = { ...mockProject, repoNaming: 'direct' };
+            const resolved = resolveRepoConfig(mockConfig, projectWithOverride, {
+                name: 'repoD',
+                repoNaming: 'isolated',
+            });
+            expect(resolved.repoNaming).toBe('isolated');
         });
     });
 

@@ -33,6 +33,10 @@ function createTestConfig(overrides?: Partial<LoadedConfig>): LoadedConfig {
             leaveOpen: 0.3,
         },
         seed: 12345,
+        repoNaming: 'isolated',
+        repoStrategy: { createIfMissing: true, failIfMissing: false, skipIfExists: false },
+        branchStrategy: { alwaysUseRunId: true, allowCollisions: false },
+        activity: { pushFollowUpCommits: 0.3, followUpCommitsRange: { min: 1, max: 3 } },
         resolvedUsers: [
             { email: 'dev1@test.com', patEnvVar: 'PAT1', pat: 'pat1' },
             { email: 'dev2@test.com', patEnvVar: 'PAT2', pat: 'pat2' },
@@ -53,13 +57,64 @@ describe('planner', () => {
             expect(plan.repos.map(r => r.project)).toEqual(['project1', 'project1', 'project2']);
         });
 
-        it('includes runId in repo names for isolation', () => {
-            const config = createTestConfig({ runId: 'isolation-test' });
+        it('includes runId in repo names for isolation strategy', () => {
+            const config = createTestConfig({ runId: 'isolation-test', repoNaming: 'isolated' });
             const plan = createPlan(config);
 
             for (const repo of plan.repos) {
                 expect(repo.repoName).toContain('isolation-test');
+                expect(repo.resolvedNaming).toBe('isolated');
             }
+        });
+
+        it('uses direct repository names when strategy is direct', () => {
+            const config = createTestConfig({ runId: 'direct-test', repoNaming: 'direct' });
+            const plan = createPlan(config);
+
+            expect(plan.repos.find(r => r.project === 'project1' && r.repoName === 'repo1')).toBeDefined();
+            expect(plan.repos[0].resolvedNaming).toBe('direct');
+        });
+
+        it('respects per-project repoNaming overrides', () => {
+            const config = createTestConfig({
+                repoNaming: 'isolated',
+                projects: [
+                    { name: 'p1', repos: ['r1'], repoNaming: 'direct' },
+                    { name: 'p2', repos: ['r2'] }
+                ]
+            });
+            const plan = createPlan(config);
+
+            const r1 = plan.repos.find(r => r.project === 'p1');
+            const r2 = plan.repos.find(r => r.project === 'p2');
+
+            expect(r1?.repoName).toBe('r1');
+            expect(r1?.resolvedNaming).toBe('direct');
+            expect(r2?.repoName).toBe(`r2-${config.runId}`);
+            expect(r2?.resolvedNaming).toBe('isolated');
+        });
+
+        it('respects per-repo repoNaming overrides', () => {
+            const config = createTestConfig({
+                repoNaming: 'isolated',
+                projects: [
+                    {
+                        name: 'p1',
+                        repos: [
+                            'r1',
+                            { name: 'r2', repoNaming: 'direct' }
+                        ]
+                    }
+                ]
+            });
+            const plan = createPlan(config);
+
+            const r1 = plan.repos.find(r => r.repoName.startsWith('r1-'));
+            const r2 = plan.repos.find(r => r.repoName === 'r2');
+
+            expect(r1).toBeDefined();
+            expect(r2).toBeDefined();
+            expect(r2?.resolvedNaming).toBe('direct');
         });
 
         it('creates the configured number of branches per repo', () => {
