@@ -70,4 +70,50 @@ describe('RepoManager error handling', () => {
                 .rejects.toThrow('Network Error');
         });
     });
+
+    describe('ensureRepo returns isNew flag correctly', () => {
+        it('returns isNew: false for existing repos', async () => {
+            const existingRepo = { id: 'existing-id', name: 'my-repo', url: '', remoteUrl: '' };
+            const mockClient = {
+                get: vi.fn().mockResolvedValue({ data: existingRepo }),
+            };
+
+            const repoManager = new RepoManager(mockClient as any);
+            const result = await repoManager.ensureRepo('my-project', 'my-repo', { createIfMissing: true, failIfMissing: false, skipIfExists: false });
+
+            expect(result).not.toBeNull();
+            expect(result?.repo.id).toBe('existing-id');
+            expect(result?.isNew).toBe(false);
+        });
+
+        it('returns isNew: true for newly created repos', async () => {
+            const sanitized404 = new Error('Not found');
+            (sanitized404 as any).status = 404;
+
+            const newRepo = { id: 'new-id', name: 'new-repo', url: '', remoteUrl: '' };
+            const mockClient = {
+                get: vi.fn().mockRejectedValue(sanitized404),
+                post: vi.fn().mockResolvedValue({ data: newRepo }),
+            };
+
+            const repoManager = new RepoManager(mockClient as any);
+            const result = await repoManager.ensureRepo('my-project', 'new-repo', { createIfMissing: true, failIfMissing: false, skipIfExists: false });
+
+            expect(result).not.toBeNull();
+            expect(result?.repo.id).toBe('new-id');
+            expect(result?.isNew).toBe(true);
+        });
+
+        it('returns null when skipIfExists and repo exists', async () => {
+            const existingRepo = { id: 'existing-id', name: 'my-repo', url: '', remoteUrl: '' };
+            const mockClient = {
+                get: vi.fn().mockResolvedValue({ data: existingRepo }),
+            };
+
+            const repoManager = new RepoManager(mockClient as any);
+            const result = await repoManager.ensureRepo('my-project', 'my-repo', { createIfMissing: false, failIfMissing: false, skipIfExists: true });
+
+            expect(result).toBeNull();
+        });
+    });
 });

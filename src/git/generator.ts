@@ -23,11 +23,13 @@ export class GitGenerator {
     private deriver: ContentDeriver;
     private rng: SeededRng;
     private patsToRedact: string[];
+    private targetDate?: string; // ISO timestamp for backdating commits
 
-    constructor(rng: SeededRng, fixturesPath?: string, patsToRedact: string[] = []) {
+    constructor(rng: SeededRng, fixturesPath?: string, patsToRedact: string[] = [], targetDate?: string) {
         this.rng = rng;
         this.deriver = new ContentDeriver(rng, fixturesPath);
         this.patsToRedact = patsToRedact;
+        this.targetDate = targetDate;
     }
 
     /**
@@ -120,12 +122,14 @@ export class GitGenerator {
     /**
      * Pushes all branches to a remote ADO repository.
      * PAT is injected in-memory only (never persisted to .git/config).
+     * @param skipMainPush - If true, skips pushing main (for existing repos in accumulation mode)
      */
     async pushToRemote(
         localPath: string,
         remoteUrl: string,
         pat: string,
-        branches: string[]
+        branches: string[],
+        skipMainPush: boolean = false
     ): Promise<void> {
         // Use non-secret username in URL
         const url = new URL(remoteUrl);
@@ -138,8 +142,10 @@ export class GitGenerator {
         try {
             const env = { GIT_ASKPASS: askPass.path };
 
-            // Push main first
-            await this.git(localPath, ['push', cleanUrl, 'main'], true, env);
+            // Push main first (unless skipping for existing repos)
+            if (!skipMainPush) {
+                await this.git(localPath, ['push', cleanUrl, 'main'], true, env);
+            }
 
             // Push all feature branches
             for (const branch of branches) {
@@ -255,9 +261,14 @@ export class GitGenerator {
         sensitiveOutput: boolean = false,
         env?: NodeJS.ProcessEnv
     ): Promise<{ stdout: string; stderr: string }> {
+        // Inject commit date if set (for backdating)
+        const dateEnv = this.targetDate && args.includes('commit')
+            ? { GIT_AUTHOR_DATE: this.targetDate, GIT_COMMITTER_DATE: this.targetDate }
+            : {};
+
         const result = await exec('git', args, {
             cwd,
-            env,
+            env: { ...env, ...dateEnv },
             patsToRedact: sensitiveOutput ? this.patsToRedact : [],
         });
 

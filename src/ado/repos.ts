@@ -9,6 +9,11 @@ export interface AdoRepo {
     defaultBranch?: string;
 }
 
+export interface EnsureRepoResult {
+    repo: AdoRepo;
+    isNew: boolean;
+}
+
 /**
  * Repository CRUD operations for Azure DevOps.
  */
@@ -65,15 +70,16 @@ export class RepoManager {
 
     /**
      * Ensures a repository exists, creating it if necessary, based on strategy.
+     * Returns { repo, isNew } where isNew indicates if the repo was just created.
      */
-    async ensureRepo(project: string, repoName: string, strategy: RepoStrategy): Promise<AdoRepo | null> {
+    async ensureRepo(project: string, repoName: string, strategy: RepoStrategy): Promise<EnsureRepoResult | null> {
         const existing = await this.getRepo(project, repoName);
 
         if (existing) {
             if (strategy.skipIfExists) {
                 return null;
             }
-            return existing;
+            return { repo: existing, isNew: false };
         }
 
         if (!strategy.createIfMissing) {
@@ -83,6 +89,7 @@ export class RepoManager {
             return null;
         }
 
-        return await this.createRepo(project, repoName);
+        const newRepo = await this.createRepo(project, repoName);
+        return { repo: newRepo, isNew: true };
     }
 }

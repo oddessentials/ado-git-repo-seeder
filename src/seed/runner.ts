@@ -26,7 +26,7 @@ export class SeedRunner {
     // Per-user clients for operations that need different auth
     private userClients: Map<string, ReturnType<typeof createAdoClient>> = new Map();
 
-    constructor(config: LoadedConfig, plan: SeedPlan, fixturesPath?: string, version: string = 'unknown') {
+    constructor(config: LoadedConfig, plan: SeedPlan, fixturesPath?: string, version: string = 'unknown', targetDate?: string) {
         this.version = version;
         this.config = config;
         this.plan = plan;
@@ -52,7 +52,8 @@ export class SeedRunner {
         this.gitGenerator = new GitGenerator(
             new SeededRng(config.seed),
             fixturesPath,
-            this.allPats
+            this.allPats,
+            targetDate
         );
 
         // Create per-user clients
@@ -153,11 +154,12 @@ export class SeedRunner {
 
         try {
             // Create/ensure repo exists
-            const repo = await this.repoManager.ensureRepo(planned.project, planned.repoName, this.config.repoStrategy);
-            if (!repo) {
-                // Skiped or recorded warning elsewhere (though RepoResult needs to show it)
+            const repoResult = await this.repoManager.ensureRepo(planned.project, planned.repoName, this.config.repoStrategy);
+            if (!repoResult) {
+                // Skipped or recorded warning elsewhere (though RepoResult needs to show it)
                 return result;
             }
+            const { repo, isNew } = repoResult;
             result.repoId = repo.id;
 
             // Generate and push git content (FATAL on failure)
@@ -195,29 +197,33 @@ export class SeedRunner {
                     throw new Error(`FATAL: Collision detected on branches: ${collisions.join(', ')}. This runId has already been used for this repository.`);
                 }
 
+                // Skip pushing main for existing repos (accumulation mode)
+                // New repos need main pushed; existing repos already have main
                 await this.gitGenerator.pushToRemote(
                     generated.localPath,
                     repo.remoteUrl,
                     primaryUser.pat,
-                    generated.branches
+                    generated.branches,
+                    !isNew // skipMainPush = true for existing repos
                 );
                 result.branchesCreated = generated.branches.length;
+
+                // Process PRs (NON-FATAL on individual failures)
+                // MUST happen inside try block to keep localPath alive for follow-up pushes
+                for (const plannedPr of planned.prs) {
+                    const prResult = await this.processPr(
+                        planned.project,
+                        repo, // Use repo object for remoteUrl access
+                        plannedPr,
+                        result.failures,
+                        generated.localPath // Pass localPath for follow-up push
+                    );
+                    if (prResult) {
+                        result.prs.push(prResult);
+                    }
+                }
             } finally {
                 generated.cleanup();
-            }
-
-            // Process PRs (NON-FATAL on individual failures)
-            for (const plannedPr of planned.prs) {
-                const prResult = await this.processPr(
-                    planned.project,
-                    repo, // Use repo object for remoteUrl access
-                    plannedPr,
-                    result.failures,
-                    generated.localPath // Pass localPath for follow-up push
-                );
-                if (prResult) {
-                    result.prs.push(prResult);
-                }
             }
         } catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
