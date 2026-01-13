@@ -22,8 +22,8 @@
         },
         "prsPerRepo": 2,
         "reviewersPerPr": {
-            "min": 0,
-            "max": 0
+            "min": 1,
+            "max": 1
         },
         "commentsPerPr": {
             "min": 1,
