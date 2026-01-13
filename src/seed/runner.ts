@@ -207,22 +207,23 @@ export class SeedRunner {
                     !isNew // skipMainPush = true for existing repos
                 );
                 result.branchesCreated = generated.branches.length;
+
+                // Process PRs (NON-FATAL on individual failures)
+                // MUST happen inside try block to keep localPath alive for follow-up pushes
+                for (const plannedPr of planned.prs) {
+                    const prResult = await this.processPr(
+                        planned.project,
+                        repo, // Use repo object for remoteUrl access
+                        plannedPr,
+                        result.failures,
+                        generated.localPath // Pass localPath for follow-up push
+                    );
+                    if (prResult) {
+                        result.prs.push(prResult);
+                    }
+                }
             } finally {
                 generated.cleanup();
-            }
-
-            // Process PRs (NON-FATAL on individual failures)
-            for (const plannedPr of planned.prs) {
-                const prResult = await this.processPr(
-                    planned.project,
-                    repo, // Use repo object for remoteUrl access
-                    plannedPr,
-                    result.failures,
-                    generated.localPath // Pass localPath for follow-up push
-                );
-                if (prResult) {
-                    result.prs.push(prResult);
-                }
             }
         } catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
