@@ -274,40 +274,62 @@ export class SeedRunner {
                 outcomeApplied: false,
             };
 
-            // Add reviewers (non-fatal)
-            for (const reviewer of planned.reviewers) {
+            // Publish draft if planned (90% of drafts get published before operations)
+            let effectivelyDraft = planned.isDraft;
+            if (planned.isDraft && planned.shouldPublishDraft) {
                 try {
-                    const user = this.config.resolvedUsers.find(u => u.email === reviewer.email);
-                    if (user?.identityId) {
-                        await this.prManager.addReviewer({
-                            project,
-                            repoId,
-                            prId: pr.pullRequestId,
-                            reviewerId: user.identityId,
-                        });
-
-                        // Cast vote using reviewer's client
-                        const reviewerClient = this.userClients.get(reviewer.email);
-                        if (reviewerClient) {
-                            const reviewerPrManager = new PrManager(reviewerClient);
-                            await reviewerPrManager.castVote({
-                                project,
-                                repoId,
-                                prId: pr.pullRequestId,
-                                reviewerId: user.identityId,
-                                vote: voteToValue(reviewer.vote),
-                            });
-                        }
-
-                        prResult.reviewers.push({ email: reviewer.email, vote: reviewer.vote });
-                    }
+                    await this.prManager.publishDraft(project, repoId, pr.pullRequestId);
+                    effectivelyDraft = false; // Now it's a regular PR
                 } catch (error) {
+                    // Publish failed - treat as lingering draft
                     failures.push({
-                        phase: 'add-reviewer',
+                        phase: 'publish-draft',
                         prId: pr.pullRequestId,
                         error: error instanceof Error ? error.message : String(error),
                         isFatal: false,
                     });
+                }
+            }
+
+            // Add reviewers (non-fatal) - skip for drafts since ADO rejects voting on drafts
+            if (!effectivelyDraft) {
+                for (const reviewer of planned.reviewers) {
+                    try {
+                        const user = this.config.resolvedUsers.find(u => u.email === reviewer.email);
+                        if (user?.identityId) {
+                            await this.prManager.addReviewer({
+                                project,
+                                repoId,
+                                prId: pr.pullRequestId,
+                                reviewerId: user.identityId,
+                            });
+
+                            // Cast vote using reviewer's client
+                            const reviewerClient = this.userClients.get(reviewer.email);
+                            if (reviewerClient) {
+                                const reviewerPrManager = new PrManager(reviewerClient);
+                                await reviewerPrManager.castVote({
+                                    project,
+                                    repoId,
+                                    prId: pr.pullRequestId,
+                                    reviewerId: user.identityId,
+                                    vote: voteToValue(reviewer.vote),
+                                });
+                            }
+
+                            prResult.reviewers.push({ email: reviewer.email, vote: reviewer.vote });
+                        }
+                    } catch (error) {
+                        // Capture detailed ADO error response when available
+                        const adoData = (error as { data?: unknown })?.data;
+                        const errorDetail = adoData ? ` - ${JSON.stringify(adoData)}` : '';
+                        failures.push({
+                            phase: 'add-reviewer',
+                            prId: pr.pullRequestId,
+                            error: (error instanceof Error ? error.message : String(error)) + errorDetail,
+                            isFatal: false,
+                        });
+                    }
                 }
             }
 
@@ -335,9 +357,12 @@ export class SeedRunner {
                 }
             }
 
-            // Apply outcome (non-fatal)
+            // Apply outcome (non-fatal) - skip for drafts since they can't be completed/abandoned
             try {
-                if (planned.outcome === 'complete') {
+                if (effectivelyDraft) {
+                    // Draft PRs cannot be completed or abandoned - leave them as-is
+                    prResult.outcomeApplied = true; // Skip counts as "applied" for drafts
+                } else if (planned.outcome === 'complete') {
                     // Robust completion with retry for 409
                     let retries = 0;
                     const maxPrRetries = 2;

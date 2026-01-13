@@ -83,6 +83,7 @@ async function runSmokeTest() {
                 title: `[SMOKE TEST] ${config.runId}`,
                 description: 'End-to-end smoke test for GIT_ASKPASS validation.',
                 isDraft: false,
+                shouldPublishDraft: false,
                 reviewers: [],
                 comments: [],
                 outcome: 'leaveOpen',

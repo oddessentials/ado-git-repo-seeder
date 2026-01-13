@@ -26,6 +26,7 @@ export interface PlannedPr {
     title: string;
     description: string;
     isDraft: boolean;
+    shouldPublishDraft: boolean; // 99% of drafts get published before reviewer/outcome ops
     reviewers: PlannedReviewer[];
     comments: PlannedComment[];
     outcome: PrOutcome;
@@ -127,12 +128,14 @@ export function createPlan(config: LoadedConfig): SeedPlan {
                     ? rng.int(config.activity.followUpCommitsRange.min, config.activity.followUpCommitsRange.max)
                     : 0;
 
+                const isDraft = rng.random() < 0.1; // 10% drafts
                 prs.push({
                     sourceBranch: branch.name,
                     creatorEmail: creator.email,
                     title: `[${config.runId}] ${branch.name}`,
                     description: `Seeded PR for testing. Run ID: ${config.runId}`,
-                    isDraft: rng.random() < 0.1, // 10% drafts
+                    isDraft,
+                    shouldPublishDraft: isDraft && rng.random() < 0.9, // 90% of drafts get published
                     reviewers,
                     comments,
                     outcome,

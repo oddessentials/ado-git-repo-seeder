@@ -154,6 +154,17 @@ export class PrManager {
     }
 
     /**
+     * Publishes a draft PR (converts it to a regular PR).
+     */
+    async publishDraft(project: string, repoId: string, prId: number): Promise<void> {
+        await this.client.patch(
+            `/${project}/_apis/git/repositories/${repoId}/pullrequests/${prId}`,
+            { isDraft: false },
+            { params: { 'api-version': '7.1' } }
+        );
+    }
+
+    /**
      * Gets policy configurations for a project.
      */
     async getPolicyConfigurations(project: string): Promise<any[]> {

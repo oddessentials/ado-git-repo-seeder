@@ -203,6 +203,32 @@ describe('planner', () => {
                 }
             }
         });
+
+        it('draft PRs include shouldPublishDraft field', () => {
+            // Generate many PRs to find drafts (10% chance)
+            const config = createTestConfig({
+                seed: 42,
+                scale: { ...createTestConfig().scale, prsPerRepo: 20 }
+            });
+            const plan = createPlan(config);
+
+            const allPrs = plan.repos.flatMap(r => r.prs);
+            const drafts = allPrs.filter(p => p.isDraft);
+
+            // Should have some drafts (10% of 60 PRs = ~6)
+            expect(drafts.length).toBeGreaterThan(0);
+
+            // All drafts should have shouldPublishDraft field
+            for (const draft of drafts) {
+                expect(typeof draft.shouldPublishDraft).toBe('boolean');
+            }
+
+            // Non-drafts should have shouldPublishDraft = false
+            const nonDrafts = allPrs.filter(p => !p.isDraft);
+            for (const pr of nonDrafts) {
+                expect(pr.shouldPublishDraft).toBe(false);
+            }
+        });
     });
 
     describe('voteToValue()', () => {
