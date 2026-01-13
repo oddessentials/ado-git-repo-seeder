@@ -14,8 +14,15 @@ describe('exec utility', () => {
         const originalEnv = { ...process.env };
 
         afterEach(() => {
-            // Restore original env
-            process.env = { ...originalEnv };
+            // Restore original env by mutating (preserves Windows case-insensitive lookup)
+            for (const key of Object.keys(process.env)) {
+                if (!(key in originalEnv)) {
+                    delete process.env[key];
+                }
+            }
+            for (const [key, value] of Object.entries(originalEnv)) {
+                process.env[key] = value;
+            }
         });
 
         it('preserves ComSpec when custom env vars are passed', async () => {
