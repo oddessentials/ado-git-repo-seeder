@@ -302,10 +302,13 @@ export class SeedRunner {
                         prResult.reviewers.push({ email: reviewer.email, vote: reviewer.vote });
                     }
                 } catch (error) {
+                    // Capture detailed ADO error response when available
+                    const adoData = (error as { data?: unknown })?.data;
+                    const errorDetail = adoData ? ` - ${JSON.stringify(adoData)}` : '';
                     failures.push({
                         phase: 'add-reviewer',
                         prId: pr.pullRequestId,
-                        error: error instanceof Error ? error.message : String(error),
+                        error: (error instanceof Error ? error.message : String(error)) + errorDetail,
                         isFatal: false,
                     });
                 }
