@@ -32,7 +32,15 @@ export async function exec(
 
         const proc = spawn(command, escapedArgs, {
             cwd,
-            env: { ...process.env, ...env, GIT_TERMINAL_PROMPT: '0' },
+            // Preserve Windows-critical env vars (ComSpec, SYSTEMROOT) to avoid cmd.exe ENOENT
+            env: {
+                ...process.env,
+                ...env,
+                GIT_TERMINAL_PROMPT: '0',
+                // Explicitly preserve ComSpec for Windows shell spawning
+                ComSpec: process.env.ComSpec,
+                SYSTEMROOT: process.env.SYSTEMROOT,
+            },
             shell: true,
         });
 
