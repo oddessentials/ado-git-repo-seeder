@@ -15,25 +15,32 @@ npm run build
 ```
 
 ## 3. Configuration
-Create a `seed.config.json` in the root directory. Use `repoNaming: direct` for authentic accumulation on existing repos:
+Create a `seed.config.json` in the root directory. There are two primary naming strategies:
 
+### Strategy A: Isolated (Greenfield)
+Ideal for creating brand new repositories for every run (unique IDs). Each run will create a repository named `YourRepo-runId`.
 ```json
 {
-  "org": "your-org-name",
-  "projects": [
-    {
-      "name": "YourProjectName",
-      "repos": ["YourRepoName"],
-      "repoNaming": "direct"
-    }
-  ],
-  "users": [
-    { "email": "dev-user@example.com", "patEnvVar": "ADO_PAT" }
-  ],
-  "seed": 42,
-  "repoNaming": "direct"
+  "org": "your-org",
+  "projects": [{ "name": "Proj", "repos": ["App"] }],
+  "repoNaming": "isolated",
+  "seed": 42
 }
 ```
+
+### Strategy B: Direct (Accumulation)
+Ideal for seeding existing repositories or simulating multi-day activity on the same repo.
+```json
+{
+  "org": "your-org",
+  "projects": [{ "name": "Proj", "repos": ["App"], "repoNaming": "direct" }],
+  "repoNaming": "direct",
+  "seed": 42
+}
+```
+
+> [!IMPORTANT]
+> For a deep dive into multi-run idempotency, collision guarding, and the "Golden" accumulation pattern, see the [Multi-Run Accumulation Guide](docs/accumulation-patterns.md).
 
 ## 4. Environment Variables
 Set the environment variable for your PAT (matching the `patEnvVar` in your config):
