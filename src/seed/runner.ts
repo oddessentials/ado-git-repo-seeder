@@ -26,7 +26,7 @@ export class SeedRunner {
     // Per-user clients for operations that need different auth
     private userClients: Map<string, ReturnType<typeof createAdoClient>> = new Map();
 
-    constructor(config: LoadedConfig, plan: SeedPlan, fixturesPath?: string, version: string = 'unknown') {
+    constructor(config: LoadedConfig, plan: SeedPlan, fixturesPath?: string, version: string = 'unknown', targetDate?: string) {
         this.version = version;
         this.config = config;
         this.plan = plan;
@@ -52,7 +52,8 @@ export class SeedRunner {
         this.gitGenerator = new GitGenerator(
             new SeededRng(config.seed),
             fixturesPath,
-            this.allPats
+            this.allPats,
+            targetDate
         );
 
         // Create per-user clients

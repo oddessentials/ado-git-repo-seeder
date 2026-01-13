@@ -15,8 +15,9 @@ interface CliArgs {
     runId?: string;
     outputDir: string;
     fixturesPath?: string;
-    repoNaming?: 'isolated' | 'direct'; // NEW
-    purgeStale: boolean; // NEW
+    repoNaming?: 'isolated' | 'direct';
+    purgeStale: boolean;
+    targetDate?: string; // ISO timestamp for git commit backdating
 }
 
 function parseArgs(): CliArgs {
@@ -63,6 +64,20 @@ function parseArgs(): CliArgs {
             case '--purge-stale':
                 result.purgeStale = true;
                 break;
+            case '--date': {
+                const dateStr = args[++i];
+                if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                    console.error('❌ Invalid --date format. Expected YYYY-MM-DD (e.g., 2026-01-10)');
+                    process.exit(1);
+                }
+                const parsed = new Date(`${dateStr}T12:00:00Z`);
+                if (isNaN(parsed.getTime())) {
+                    console.error(`❌ Invalid date: ${dateStr}`);
+                    process.exit(1);
+                }
+                result.targetDate = parsed.toISOString();
+                break;
+            }
             case '--help':
             case '-h':
                 printHelp();
@@ -89,7 +104,11 @@ Options:
   -f, --fixtures <path>   Path to fixtures directory for content derivation
   --naming <mode>         Override global repoNaming strategy (isolated | direct)
   --purge-stale           Purge the temporary working directory on startup
+  --date <YYYY-MM-DD>     Backdate git commits to this date (noon UTC)
   -h, --help              Show this help message
+
+Note: --date only affects git commit timestamps. PRs, comments, and votes
+are server-assigned and will show actual execution time.
 
 Examples:
   # Preview what would be created
@@ -98,8 +117,8 @@ Examples:
   # Run with direct naming (re-use existing repos)
   npx ts-node src/cli.ts --naming direct
 
-  # Use fixtures from test-fixtures submodule
-  npx ts-node src/cli.ts --fixtures ./fixtures
+  # Backdate commits to simulate historical activity
+  npx ts-node src/cli.ts --run-id day-1 --date 2026-01-10
 `);
 }
 
@@ -205,7 +224,7 @@ async function main(): Promise<void> {
         }
     }
 
-    const runner = new SeedRunner(config, plan, fixturesPath, version);
+    const runner = new SeedRunner(config, plan, fixturesPath, version, args.targetDate);
     const summary = await runner.run();
 
     // Output results
