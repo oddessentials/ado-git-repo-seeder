@@ -1,0 +1,28 @@
+🌱 ADO Git Repo Seeder (v1.1.0)
+
+🧪 Starting E2E Smoke Test...
+   Target: oddessentials/seeder-test/smoke-repo
+
+[git] git init
+[git] git checkout -M main
+[git] git add .
+[git] git commit -m "Initial commit"
+[git] git checkout -b smoke/smoke-812
+
+[git] git ls-remote --heads https://seeder@dev.azure.com/oddessentials/_git/smoke-repo
+      (GIT_ASKPASS: /tmp/askpass-9m2k.sh)
+      Success: No collisions detected.
+
+[git] git push https://seeder@dev.azure.com/oddessentials/_git/smoke-repo main
+      (GIT_ASKPASS: /tmp/askpass-9m2k.sh)
+      Success: Pushed main.
+
+[git] git push https://seeder@dev.azure.com/oddessentials/_git/smoke-repo smoke/smoke-812
+      (GIT_ASKPASS: /tmp/askpass-9m2k.sh)
+      Success: Pushed smoke/smoke-812.
+
+[ado] Creating PR: smoke/smoke-812 -> main
+      Success: PR #1235 created.
+
+✅ Smoke Test Successful! (Unix)
+   PR Created: #1235

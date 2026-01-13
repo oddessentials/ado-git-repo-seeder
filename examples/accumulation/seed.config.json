@@ -1,0 +1,36 @@
+{
+    "org": "your-org",
+    "projects": [
+        {
+            "name": "ProjectAlpha",
+            "repos": [
+                "MainService"
+            ],
+            "repoNaming": "direct"
+        }
+    ],
+    "users": [
+        {
+            "email": "dev1@example.com",
+            "patEnvVar": "ADO_PAT_DEV1"
+        }
+    ],
+    "scale": {
+        "branchesPerRepo": 1,
+        "commitsPerBranch": {
+            "min": 2,
+            "max": 5
+        },
+        "prsPerRepo": 1,
+        "reviewersPerPr": {
+            "min": 1,
+            "max": 2
+        },
+        "commentsPerPr": {
+            "min": 1,
+            "max": 3
+        }
+    },
+    "seed": 8888,
+    "repoNaming": "direct"
+}

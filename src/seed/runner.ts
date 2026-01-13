@@ -12,6 +12,7 @@ import { SeededRng } from '../util/rng.js';
  * Executes the seeding plan against Azure DevOps.
  */
 export class SeedRunner {
+    private version: string; // NEW
     private config: LoadedConfig;
     private plan: SeedPlan;
     private adoClient: ReturnType<typeof createAdoClient>;
@@ -25,7 +26,8 @@ export class SeedRunner {
     // Per-user clients for operations that need different auth
     private userClients: Map<string, ReturnType<typeof createAdoClient>> = new Map();
 
-    constructor(config: LoadedConfig, plan: SeedPlan, fixturesPath?: string) {
+    constructor(config: LoadedConfig, plan: SeedPlan, fixturesPath?: string, version: string = 'unknown') {
+        this.version = version;
         this.config = config;
         this.plan = plan;
         this.allPats = config.resolvedUsers.map(u => u.pat);
@@ -68,6 +70,7 @@ export class SeedRunner {
      */
     async run(): Promise<SeedSummary> {
         const summary: SeedSummary = {
+            version: this.version, // NEW
             runId: this.config.runId,
             org: this.config.org,
             startTime: new Date().toISOString(),

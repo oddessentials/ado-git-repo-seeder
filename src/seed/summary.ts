@@ -30,6 +30,7 @@ export interface RepoResult {
 }
 
 export interface SeedSummary {
+    version: string; // NEW
     runId: string;
     org: string;
     startTime: string;
@@ -53,6 +54,7 @@ export function generateMarkdownSummary(summary: SeedSummary): string {
 
     lines.push(`# Seed Run Summary`);
     lines.push('');
+    lines.push(`**Version:** ${summary.version}`);
     lines.push(`**Run ID:** ${summary.runId}`);
     lines.push(`**Organization:** ${summary.org}`);
     lines.push(`**Started:** ${summary.startTime}`);

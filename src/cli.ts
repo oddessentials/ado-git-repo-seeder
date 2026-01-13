@@ -3,8 +3,9 @@ import { loadConfig } from './config.js';
 import { createPlan } from './seed/planner.js';
 import { SeedRunner } from './seed/runner.js';
 import { writeSummary, printSummary, generateMarkdownSummary } from './seed/summary.js';
-import { writeFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { writeFileSync, readFileSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 
 interface CliArgs {
@@ -105,7 +106,19 @@ Examples:
 async function main(): Promise<void> {
     const args = parseArgs();
 
-    console.log('🌱 ADO Git Repo Seeder\n');
+    // Load version from package.json
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const pkgPath = resolve(__dirname, '../package.json');
+    let version = 'unknown';
+    try {
+        if (existsSync(pkgPath)) {
+            const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+            version = pkg.version;
+        }
+    } catch { }
+
+    console.log(`🌱 ADO Git Repo Seeder (v${version})\n`);
 
     // Load config
     console.log(`📄 Loading config from: ${args.config}`);
@@ -186,7 +199,7 @@ async function main(): Promise<void> {
         }
     }
 
-    const runner = new SeedRunner(config, plan, fixturesPath);
+    const runner = new SeedRunner(config, plan, fixturesPath, version);
     const summary = await runner.run();
 
     // Output results

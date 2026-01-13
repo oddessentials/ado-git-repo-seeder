@@ -1,6 +1,6 @@
 {
   "name": "ado-git-repo-seeder",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Configurable tool to seed realistic, multi-user pull-request activity on Azure DevOps",
   "main": "dist/cli.js",
   "type": "module",
@@ -21,10 +21,16 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@commitlint/cli": "^20.3.1",
+    "@commitlint/config-conventional": "^20.3.1",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/npm": "^13.1.3",
     "@types/node": "^20.11.0",
     "@types/seedrandom": "^3.0.8",
     "eslint": "^8.56.0",
     "husky": "^9.1.7",
+    "semantic-release": "^25.0.2",
     "typescript": "^5.3.3",
     "vitest": "^1.2.0"
   },
