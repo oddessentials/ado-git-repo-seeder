@@ -14,7 +14,16 @@ This documentation follows a **Normative vs. Descriptive** architecture. Technic
 
 ### 📘 Guidance & Security
 - **[Multi-User Simulation & Security](docs/multi-user.md)**: Simulating real developers, identity resolution, and critical security "DO NOTs."
-- **[Examples](examples/)**: Golden configuration templates for different scenarios.
+
+### 📂 Examples
+
+| Example | Users | Strategy | Use Case |
+|---------|-------|----------|----------|
+| [single-user](examples/single-user/) | 1 | isolated | Quick demo, solo dev |
+| [multi-user-team](examples/multi-user-team/) | 5 | isolated | Team simulation |
+| [enterprise](examples/enterprise/) | 10 | isolated | Large-scale testing |
+| [accumulation](examples/accumulation/) | 2 | direct | Multi-day activity |
+| [isolated-greenfield](examples/isolated-greenfield/) | 1 | isolated | Fresh repos per run |
 
 ---
 

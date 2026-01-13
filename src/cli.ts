@@ -148,8 +148,14 @@ async function main(): Promise<void> {
 
     console.log(`   Organization: ${config.org}`);
     console.log(`   Run ID: ${config.runId}`);
-    console.log(`   Users: ${config.resolvedUsers.length}`);
     console.log(`   Projects: ${config.projects.length}`);
+    console.log('');
+    console.log('   Users (env-var resolution):');
+    for (const user of config.resolvedUsers) {
+        const isSet = !!process.env[user.patEnvVar];
+        const status = isSet ? '✓ set' : '✗ unset';
+        console.log(`     ${user.email} → ${user.patEnvVar} (${status})`);
+    }
     console.log('');
 
     // Create plan

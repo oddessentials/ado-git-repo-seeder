@@ -10,16 +10,12 @@
     ],
     "users": [
         {
-            "email": "dev1@example.com",
-            "patEnvVar": "ADO_PAT_DEV1"
-        },
-        {
-            "email": "dev2@example.com",
-            "patEnvVar": "ADO_PAT_DEV2"
+            "email": "dev@example.com",
+            "patEnvVar": "ADO_PAT"
         }
     ],
     "scale": {
-        "branchesPerRepo": 2,
+        "branchesPerRepo": 3,
         "commitsPerBranch": {
             "min": 2,
             "max": 5
@@ -35,16 +31,16 @@
         }
     },
     "voteDistribution": {
-        "approve": 0.6,
-        "approveWithSuggestions": 0.2,
-        "reject": 0.05,
-        "noVote": 0.15
+        "approve": 0,
+        "approveWithSuggestions": 0,
+        "reject": 0,
+        "noVote": 1
     },
     "prOutcomes": {
-        "complete": 0.7,
-        "abandon": 0.15,
-        "leaveOpen": 0.15
+        "complete": 0.8,
+        "abandon": 0.1,
+        "leaveOpen": 0.1
     },
-    "seed": 8888,
-    "repoNaming": "direct"
+    "seed": 7777,
+    "repoNaming": "isolated"
 }

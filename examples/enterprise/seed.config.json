@@ -1,0 +1,101 @@
+{
+    "org": "your-org",
+    "projects": [
+        {
+            "name": "marketing",
+            "repos": [
+                "marketing-site",
+                "marketing-content",
+                "brand-assets"
+            ]
+        },
+        {
+            "name": "engineering",
+            "repos": [
+                "core-api",
+                "web-app",
+                "mobile-app",
+                "infra",
+                "shared-libs"
+            ]
+        },
+        {
+            "name": "hospitality",
+            "repos": [
+                "booking-system",
+                "guest-portal",
+                "inventory-mgmt"
+            ]
+        }
+    ],
+    "users": [
+        {
+            "email": "alice@example.com",
+            "patEnvVar": "ADO_PAT_ALICE"
+        },
+        {
+            "email": "bob@example.com",
+            "patEnvVar": "ADO_PAT_BOB"
+        },
+        {
+            "email": "carol@example.com",
+            "patEnvVar": "ADO_PAT_CAROL"
+        },
+        {
+            "email": "dave@example.com",
+            "patEnvVar": "ADO_PAT_DAVE"
+        },
+        {
+            "email": "eve@example.com",
+            "patEnvVar": "ADO_PAT_EVE"
+        },
+        {
+            "email": "frank@example.com",
+            "patEnvVar": "ADO_PAT_FRANK"
+        },
+        {
+            "email": "grace@example.com",
+            "patEnvVar": "ADO_PAT_GRACE"
+        },
+        {
+            "email": "henry@example.com",
+            "patEnvVar": "ADO_PAT_HENRY"
+        },
+        {
+            "email": "iris@example.com",
+            "patEnvVar": "ADO_PAT_IRIS"
+        },
+        {
+            "email": "jack@example.com",
+            "patEnvVar": "ADO_PAT_JACK"
+        }
+    ],
+    "scale": {
+        "branchesPerRepo": 3,
+        "commitsPerBranch": {
+            "min": 2,
+            "max": 6
+        },
+        "prsPerRepo": 2,
+        "reviewersPerPr": {
+            "min": 1,
+            "max": 3
+        },
+        "commentsPerPr": {
+            "min": 1,
+            "max": 4
+        }
+    },
+    "voteDistribution": {
+        "approve": 0.55,
+        "approveWithSuggestions": 0.2,
+        "reject": 0.05,
+        "noVote": 0.2
+    },
+    "prOutcomes": {
+        "complete": 0.65,
+        "abandon": 0.2,
+        "leaveOpen": 0.15
+    },
+    "seed": 999999
+}
