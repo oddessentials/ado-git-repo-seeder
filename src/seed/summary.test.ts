@@ -5,6 +5,7 @@ import type { SeedSummary } from './summary.js';
 describe('summary', () => {
     describe('generateMarkdownSummary()', () => {
         const baseSummary: SeedSummary = {
+            version: '1.1.0',
             runId: 'test-run-001',
             org: 'test-org',
             startTime: '2026-01-12T10:00:00Z',
@@ -45,10 +46,11 @@ describe('summary', () => {
                         project: 'p1',
                         repoName: 'r1',
                         repoId: 'id1',
+                        resolvedNaming: 'isolated',
                         branchesCreated: 3,
                         prs: [
-                            { prId: 1, title: 'PR1', creator: 'a@b.com', reviewers: [], comments: 2, outcome: 'complete', outcomeApplied: true },
-                            { prId: 2, title: 'PR2', creator: 'c@d.com', reviewers: [], comments: 1, outcome: 'abandon', outcomeApplied: true },
+                            { prId: 1, title: 'PR1', creator: 'a@b.com', reviewers: [], comments: 2, outcome: 'complete', outcomeApplied: true, followUpCommitsAdded: 0 },
+                            { prId: 2, title: 'PR2', creator: 'c@d.com', reviewers: [], comments: 1, outcome: 'abandon', outcomeApplied: true, followUpCommitsAdded: 0 },
                         ],
                         failures: [],
                     },
@@ -56,9 +58,10 @@ describe('summary', () => {
                         project: 'p2',
                         repoName: 'r2',
                         repoId: 'id2',
+                        resolvedNaming: 'direct',
                         branchesCreated: 2,
                         prs: [
-                            { prId: 3, title: 'PR3', creator: 'e@f.com', reviewers: [], comments: 0, outcome: 'leaveOpen', outcomeApplied: true },
+                            { prId: 3, title: 'PR3', creator: 'e@f.com', reviewers: [], comments: 0, outcome: 'leaveOpen', outcomeApplied: true, followUpCommitsAdded: 0 },
                         ],
                         failures: [{ phase: 'add-comment', error: 'timeout', isFatal: false }],
                     },
@@ -81,6 +84,7 @@ describe('summary', () => {
                         project: 'proj',
                         repoName: 'repo',
                         repoId: 'rid',
+                        resolvedNaming: 'isolated',
                         branchesCreated: 1,
                         prs: [
                             {
@@ -91,6 +95,7 @@ describe('summary', () => {
                                 comments: 3,
                                 outcome: 'complete',
                                 outcomeApplied: true,
+                                followUpCommitsAdded: 0,
                             },
                         ],
                         failures: [],
@@ -115,6 +120,7 @@ describe('summary', () => {
                         project: 'proj',
                         repoName: 'repo',
                         repoId: 'rid',
+                        resolvedNaming: 'direct',
                         branchesCreated: 1,
                         prs: [],
                         failures: [

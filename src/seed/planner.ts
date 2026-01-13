@@ -1,5 +1,5 @@
 import { SeededRng } from '../util/rng.js';
-import { LoadedConfig, ResolvedUser } from '../config.js';
+import { resolveRepoConfig, LoadedConfig, ResolvedUser } from '../config.js';
 import { VoteValue } from '../ado/prs.js';
 
 export type PrOutcome = 'complete' | 'abandon' | 'leaveOpen';
@@ -29,11 +29,13 @@ export interface PlannedPr {
     reviewers: PlannedReviewer[];
     comments: PlannedComment[];
     outcome: PrOutcome;
+    followUpCommits: number; // NEW
 }
 
 export interface PlannedRepo {
     project: string;
     repoName: string;
+    resolvedNaming: 'isolated' | 'direct'; // NEW for summary visibility
     branches: PlannedBranch[];
     prs: PlannedPr[];
 }
@@ -65,9 +67,13 @@ export function createPlan(config: LoadedConfig): SeedPlan {
     const repos: PlannedRepo[] = [];
 
     for (const project of config.projects) {
-        for (const repoName of project.repos) {
-            // Apply runId to repo name for isolation
-            const isolatedRepoName = `${repoName}-${config.runId}`;
+        for (const repoConfig of project.repos) {
+            const resolved = resolveRepoConfig(config, project, repoConfig);
+
+            // Apply naming strategy
+            const effectiveRepoName = resolved.repoNaming === 'isolated'
+                ? `${resolved.name}-${config.runId}`
+                : resolved.name;
 
             // Plan branches
             const branches: PlannedBranch[] = [];
@@ -115,6 +121,12 @@ export function createPlan(config: LoadedConfig): SeedPlan {
                 // Determine outcome
                 const outcome = rng.weighted(config.prOutcomes) as PrOutcome;
 
+                // Plan follow-up commits
+                const pushFollowUp = rng.random() < config.activity.pushFollowUpCommits;
+                const followUpCommits = pushFollowUp
+                    ? rng.int(config.activity.followUpCommitsRange.min, config.activity.followUpCommitsRange.max)
+                    : 0;
+
                 prs.push({
                     sourceBranch: branch.name,
                     creatorEmail: creator.email,
@@ -124,12 +136,14 @@ export function createPlan(config: LoadedConfig): SeedPlan {
                     reviewers,
                     comments,
                     outcome,
+                    followUpCommits,
                 });
             }
 
             repos.push({
                 project: project.name,
-                repoName: isolatedRepoName,
+                repoName: effectiveRepoName,
+                resolvedNaming: resolved.repoNaming,
                 branches,
                 prs,
             });

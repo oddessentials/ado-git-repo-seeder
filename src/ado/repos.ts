@@ -1,4 +1,5 @@
 import { AxiosInstance } from 'axios';
+import { RepoStrategy } from '../config.js';
 
 export interface AdoRepo {
     id: string;
@@ -39,7 +40,8 @@ export class RepoManager {
             );
             return response.data;
         } catch (error) {
-            if ((error as { status?: number }).status === 404) {
+            // ADO returns 404 if repo not found
+            if ((error as { response?: { status?: number } }).response?.status === 404) {
                 return null;
             }
             throw error;
@@ -59,13 +61,25 @@ export class RepoManager {
     }
 
     /**
-     * Ensures a repository exists, creating it if necessary.
+     * Ensures a repository exists, creating it if necessary, based on strategy.
      */
-    async ensureRepo(project: string, repoName: string): Promise<AdoRepo> {
+    async ensureRepo(project: string, repoName: string, strategy: RepoStrategy): Promise<AdoRepo | null> {
         const existing = await this.getRepo(project, repoName);
+
         if (existing) {
+            if (strategy.skipIfExists) {
+                return null;
+            }
             return existing;
         }
+
+        if (!strategy.createIfMissing) {
+            if (strategy.failIfMissing) {
+                throw new Error(`FATAL: Repository '${repoName}' does not exist in project '${project}' and createIfMissing is false.`);
+            }
+            return null;
+        }
+
         return await this.createRepo(project, repoName);
     }
 }

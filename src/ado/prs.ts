@@ -132,6 +132,17 @@ export class PrManager {
     }
 
     /**
+     * Gets a pull request by ID.
+     */
+    async getPrDetails(project: string, repoId: string, prId: number): Promise<PullRequest & { lastMergeSourceCommit: { commitId: string } }> {
+        const response = await this.client.get(
+            `/${project}/_apis/git/repositories/${repoId}/pullrequests/${prId}`,
+            { params: { 'api-version': '7.1' } }
+        );
+        return response.data;
+    }
+
+    /**
      * Abandons a pull request.
      */
     async abandonPr(project: string, repoId: string, prId: number): Promise<void> {
@@ -140,5 +151,15 @@ export class PrManager {
             { status: 'abandoned' },
             { params: { 'api-version': '7.1' } }
         );
+    }
+
+    /**
+     * Gets policy configurations for a project.
+     */
+    async getPolicyConfigurations(project: string): Promise<any[]> {
+        const response = await this.client.get(`/${project}/_apis/policy/configurations`, {
+            params: { 'api-version': '7.1' },
+        });
+        return response.data?.value ?? [];
     }
 }

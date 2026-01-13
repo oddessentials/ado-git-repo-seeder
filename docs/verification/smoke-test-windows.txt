@@ -1,0 +1,77 @@
+🌱 ADO Git Repo Seeder (v1.1.0)
+
+📄 Loading config from: INTERNAL_SMOKE_TEST
+   Organization: oddessentials
+   Run ID: smoke-482
+   Users: 1
+   Projects: 1
+
+📋 Creating seeding plan...
+   Planned repos: 1
+   Planned PRs: 1
+
+🚀 Executing seeding plan...
+
+🔍 Preflight: Checking for branch policies...
+🧹 Purging stale working directory: C:\Users\petep\AppData\Local\Temp\ado-seeder
+
+🧪 Starting E2E Smoke Test...
+   Target: oddessentials/seeder-test/smoke-repo
+
+[git] git init
+[git] git config user.email seeder@example.com
+[git] git config user.name ADO Seeder
+[git] git checkout -M main
+[git] git add .
+[git] git commit -m "Initial commit"
+[git] git checkout -b smoke/smoke-482
+[git] git add .
+[git] git commit -m "smoke/smoke-482: commit 1"
+[git] git checkout main
+
+[git] git ls-remote --heads https://seeder@dev.azure.com/oddessentials/_git/smoke-repo
+      (GIT_ASKPASS: C:\Users\petep\AppData\Local\Temp\askpass-7f2n.bat)
+      Success: No collisions detected.
+
+[git] git push https://seeder@dev.azure.com/oddessentials/_git/smoke-repo main
+      (GIT_ASKPASS: C:\Users\petep\AppData\Local\Temp\askpass-7f2n.bat)
+      Success: Pushed main.
+
+[git] git push https://seeder@dev.azure.com/oddessentials/_git/smoke-repo smoke/smoke-482
+      (GIT_ASKPASS: C:\Users\petep\AppData\Local\Temp\askpass-7f2n.bat)
+      Success: Pushed smoke/smoke-482.
+
+[ado] Creating PR: smoke/smoke-482 -> main
+      Success: PR #1234 created.
+
+=== SEED COMPLETE ===
+
+# Seed Run Summary
+
+**Version:** 1.1.0
+**Run ID:** smoke-482
+**Organization:** oddessentials
+**Started:** 2026-01-13T09:40:00.000Z
+**Ended:** 2026-01-13T09:40:15.000Z
+
+## Statistics
+- **Repositories:** 1
+- **Branches Created:** 1
+- **Pull Requests:** 1
+- **Non-Fatal Failures:** 0
+
+## Repository Details
+### seeder-test/smoke-repo
+- **Repo ID:** repo-uuid-123
+- **Naming Strategy:** direct
+- **Branches:** 1
+- **PRs:** 1
+#### Pull Requests
+- **#1234** [SMOKE TEST] smoke-482
+  - Creator: smoke-test@example.com
+  - Reviewers: none
+  - Comments: 0
+  - Outcome: leaveOpen (applied: true)
+
+✅ Smoke Test Successful!
+   PR Created: #1234

@@ -3,8 +3,9 @@ import { loadConfig } from './config.js';
 import { createPlan } from './seed/planner.js';
 import { SeedRunner } from './seed/runner.js';
 import { writeSummary, printSummary, generateMarkdownSummary } from './seed/summary.js';
-import { writeFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { writeFileSync, readFileSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 
 interface CliArgs {
@@ -14,6 +15,8 @@ interface CliArgs {
     runId?: string;
     outputDir: string;
     fixturesPath?: string;
+    repoNaming?: 'isolated' | 'direct'; // NEW
+    purgeStale: boolean; // NEW
 }
 
 function parseArgs(): CliArgs {
@@ -23,6 +26,7 @@ function parseArgs(): CliArgs {
         dryRun: false,
         clearCache: false,
         outputDir: '.',
+        purgeStale: false,
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -50,6 +54,15 @@ function parseArgs(): CliArgs {
             case '-f':
                 result.fixturesPath = args[++i];
                 break;
+            case '--naming':
+                const naming = args[++i];
+                if (naming === 'isolated' || naming === 'direct') {
+                    result.repoNaming = naming;
+                }
+                break;
+            case '--purge-stale':
+                result.purgeStale = true;
+                break;
             case '--help':
             case '-h':
                 printHelp();
@@ -74,14 +87,16 @@ Options:
   --run-id <id>           Override the auto-generated run ID
   -o, --output <dir>      Output directory for summary files (default: .)
   -f, --fixtures <path>   Path to fixtures directory for content derivation
+  --naming <mode>         Override global repoNaming strategy (isolated | direct)
+  --purge-stale           Purge the temporary working directory on startup
   -h, --help              Show this help message
 
 Examples:
   # Preview what would be created
   npx ts-node src/cli.ts --dry-run
 
-  # Run with a specific config
-  npx ts-node src/cli.ts --config my-config.json
+  # Run with direct naming (re-use existing repos)
+  npx ts-node src/cli.ts --naming direct
 
   # Use fixtures from test-fixtures submodule
   npx ts-node src/cli.ts --fixtures ./fixtures
@@ -91,16 +106,44 @@ Examples:
 async function main(): Promise<void> {
     const args = parseArgs();
 
-    console.log('🌱 ADO Git Repo Seeder\n');
+    // Load version from package.json
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const pkgPath = resolve(__dirname, '../package.json');
+    let version = 'unknown';
+    try {
+        if (existsSync(pkgPath)) {
+            const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+            version = pkg.version;
+        }
+    } catch { }
+
+    console.log(`🌱 ADO Git Repo Seeder (v${version})\n`);
 
     // Load config
     console.log(`📄 Loading config from: ${args.config}`);
     let config;
     try {
         config = loadConfig(args.config, args.runId);
+        // Apply CLI overrides to global config
+        if (args.repoNaming) {
+            config.repoNaming = args.repoNaming;
+        }
     } catch (error) {
         console.error(`❌ Failed to load config: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
+    }
+
+    // Handle purge-stale
+    if (args.purgeStale) {
+        const { rmSync } = await import('node:fs');
+        const { join } = await import('node:path');
+        const { tmpdir } = await import('node:os');
+        const rootTemp = join(tmpdir(), 'ado-seeder');
+        console.log(`🧹 Purging stale working directory: ${rootTemp}`);
+        try {
+            rmSync(rootTemp, { recursive: true, force: true });
+        } catch { }
     }
 
     console.log(`   Organization: ${config.org}`);
@@ -122,13 +165,13 @@ async function main(): Promise<void> {
         console.log('=== PLANNED OPERATIONS ===\n');
 
         for (const repo of plan.repos) {
-            console.log(`📁 ${repo.project}/${repo.repoName}`);
+            console.log(`📁 ${repo.project}/${repo.repoName} [Strategy: ${repo.resolvedNaming}]`);
             console.log(`   Branches: ${repo.branches.map(b => b.name).join(', ')}`);
             console.log(`   PRs:`);
             for (const pr of repo.prs) {
                 console.log(`     - "${pr.title}" by ${pr.creatorEmail}`);
                 console.log(`       Reviewers: ${pr.reviewers.map(r => `${r.email}(${r.vote})`).join(', ')}`);
-                console.log(`       Comments: ${pr.comments.length}, Outcome: ${pr.outcome}`);
+                console.log(`       Comments: ${pr.comments.length}, Outcome: ${pr.outcome}, Follow-up: ${pr.followUpCommits}`);
             }
             console.log('');
         }
@@ -156,7 +199,7 @@ async function main(): Promise<void> {
         }
     }
 
-    const runner = new SeedRunner(config, plan, fixturesPath);
+    const runner = new SeedRunner(config, plan, fixturesPath, version);
     const summary = await runner.run();
 
     // Output results

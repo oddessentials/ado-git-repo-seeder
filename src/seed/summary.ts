@@ -14,6 +14,7 @@ export interface PrResult {
     creator: string;
     reviewers: Array<{ email: string; vote: VoteType }>;
     comments: number;
+    followUpCommitsAdded: number; // NEW
     outcome: PrOutcome;
     outcomeApplied: boolean;
 }
@@ -22,12 +23,14 @@ export interface RepoResult {
     project: string;
     repoName: string;
     repoId: string | null;
+    resolvedNaming: 'isolated' | 'direct'; // NEW
     branchesCreated: number;
     prs: PrResult[];
     failures: FailureRecord[];
 }
 
 export interface SeedSummary {
+    version: string; // NEW
     runId: string;
     org: string;
     startTime: string;
@@ -51,6 +54,7 @@ export function generateMarkdownSummary(summary: SeedSummary): string {
 
     lines.push(`# Seed Run Summary`);
     lines.push('');
+    lines.push(`**Version:** ${summary.version}`);
     lines.push(`**Run ID:** ${summary.runId}`);
     lines.push(`**Organization:** ${summary.org}`);
     lines.push(`**Started:** ${summary.startTime}`);
@@ -82,6 +86,7 @@ export function generateMarkdownSummary(summary: SeedSummary): string {
     for (const repo of summary.repos) {
         lines.push(`### ${repo.project}/${repo.repoName}`);
         lines.push(`- **Repo ID:** ${repo.repoId ?? 'N/A'}`);
+        lines.push(`- **Naming Strategy:** ${repo.resolvedNaming}`);
         lines.push(`- **Branches:** ${repo.branchesCreated}`);
         lines.push(`- **PRs:** ${repo.prs.length}`);
 
@@ -92,6 +97,9 @@ export function generateMarkdownSummary(summary: SeedSummary): string {
                 lines.push(`  - Creator: ${pr.creator}`);
                 lines.push(`  - Reviewers: ${pr.reviewers.map(r => `${r.email} (${r.vote})`).join(', ') || 'none'}`);
                 lines.push(`  - Comments: ${pr.comments}`);
+                if (pr.followUpCommitsAdded > 0) {
+                    lines.push(`  - Follow-up Commits: ${pr.followUpCommitsAdded}`);
+                }
                 lines.push(`  - Outcome: ${pr.outcome} (applied: ${pr.outcomeApplied})`);
             }
         }

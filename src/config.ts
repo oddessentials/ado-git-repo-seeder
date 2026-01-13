@@ -13,9 +13,32 @@ const UserSchema = z.object({
     patEnvVar: z.string(),
 });
 
+export const RepoNamingSchema = z.enum(['isolated', 'direct']);
+export type RepoNaming = z.infer<typeof RepoNamingSchema>;
+
+const RepoConfigSchema = z.union([
+    z.string(),
+    z.object({
+        name: z.string(),
+        repoNaming: RepoNamingSchema.optional(),
+    }),
+]);
+
 const ProjectSchema = z.object({
     name: z.string(),
-    repos: z.array(z.string()),
+    repos: z.array(RepoConfigSchema),
+    repoNaming: RepoNamingSchema.optional(),
+});
+
+const RepoStrategySchema = z.object({
+    createIfMissing: z.boolean().default(true),
+    failIfMissing: z.boolean().default(false),
+    skipIfExists: z.boolean().default(false),
+});
+
+const BranchStrategySchema = z.object({
+    alwaysUseRunId: z.boolean().default(true),
+    allowCollisions: z.boolean().default(false),
 });
 
 const ScaleSchema = z.object({
@@ -39,6 +62,11 @@ const PrOutcomesSchema = z.object({
     leaveOpen: z.number().min(0).max(1),
 });
 
+const ActivitySchema = z.object({
+    pushFollowUpCommits: z.number().min(0).max(1).default(0.3),
+    followUpCommitsRange: RangeSchema.default({ min: 1, max: 3 }),
+});
+
 export const SeedConfigSchema = z.object({
     org: z.string(),
     projects: z.array(ProjectSchema),
@@ -47,11 +75,19 @@ export const SeedConfigSchema = z.object({
     voteDistribution: VoteDistributionSchema,
     prOutcomes: PrOutcomesSchema,
     seed: z.number().int(),
+    repoNaming: RepoNamingSchema.default('isolated'),
+    repoStrategy: RepoStrategySchema.default({}),
+    branchStrategy: BranchStrategySchema.default({}),
+    activity: ActivitySchema.default({}),
 });
 
 export type SeedConfig = z.infer<typeof SeedConfigSchema>;
+export type RepoConfig = z.infer<typeof RepoConfigSchema>;
 export type User = z.infer<typeof UserSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
+export type RepoStrategy = z.infer<typeof RepoStrategySchema>;
+export type BranchStrategy = z.infer<typeof BranchStrategySchema>;
+export type Activity = z.infer<typeof ActivitySchema>;
 
 export interface ResolvedUser extends User {
     pat: string;
@@ -61,6 +97,21 @@ export interface ResolvedUser extends User {
 export interface LoadedConfig extends SeedConfig {
     resolvedUsers: ResolvedUser[];
     runId: string;
+}
+
+/**
+ * Resolves properties for a specific repository using hierarchy: Repo > Project > Global.
+ */
+export function resolveRepoConfig(
+    config: SeedConfig,
+    project: Project,
+    repo: RepoConfig
+) {
+    const repoObj = typeof repo === 'string' ? { name: repo } : repo;
+    return {
+        name: repoObj.name,
+        repoNaming: repoObj.repoNaming ?? project.repoNaming ?? config.repoNaming,
+    };
 }
 
 /**
