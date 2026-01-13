@@ -12,6 +12,37 @@ A list of user identities used for seeding PRs, comments, and votes.
 - `email`: The email address of the ADO user.
 - `patEnvVar`: The name of the environment variable containing the Personal Access Token (PAT).
 
+## Environment Variables (Normative)
+
+### PAT Resolution
+Each user in the `users[]` array specifies a `patEnvVar` field. This is the **name** of the environment variable containing that user's Personal Access Token.
+
+> [!IMPORTANT]
+> Variable names are **completely flexible**. `ADO_PAT_DEV1` is just a convention.
+> You can use `MY_TOKEN`, `ALICE_PAT`, `TEAM_LEAD_TOKEN`, or any valid env var name.
+
+### Required vs Optional
+- **Required**: At least one user with a valid `patEnvVar` that resolves to a set env var
+- **Optional**: Additional users enrich simulation but are not mandatory
+
+### Scaling Users
+
+| Users | Effect |
+|-------|--------|
+| 1 | Solo simulation (same user creates all PRs, no reviewers possible) |
+| 2 | Minimal team (creator + one reviewer) |
+| 3-5 | Realistic small team |
+| 5-10 | Enterprise team simulation |
+| 10+ | Large-scale simulation (see [enterprise example](../examples/enterprise/)) |
+
+### Dry-Run Verification
+Use `--dry-run` to verify env-var resolution before running:
+```
+Users (env-var resolution):
+  alice@example.com → ADO_PAT_ALICE (✓ set)
+  bob@example.com → ADO_PAT_BOB (✗ unset)
+```
+
 ## Project & Repository Hierarchy
 
 The config supports hierarchical overrides: **Global > Project > Repo**.

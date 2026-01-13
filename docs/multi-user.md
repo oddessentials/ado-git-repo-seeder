@@ -34,6 +34,18 @@ The `ado-git-repo-seeder` is hardened with `GIT_ASKPASS` and secure redaction lo
 
 ---
 
+## Scaling Users
+
+The number of users in your `users[]` array directly affects simulation richness:
+
+- **1 user**: Solo simulation (no reviewers possible)
+- **2+ users**: Enables reviewer rotation
+- **5+ users**: Realistic team dynamics
+
+For detailed scaling guidance and env-var configuration, see **[Configuration Reference](configuration.md#scaling-users)**.
+
+---
+
 ## Technical Details
 
 ### GIT_ASKPASS Implementation
@@ -41,3 +53,4 @@ The tool generates a temporary executable script (batch on Windows, shell on Lin
 
 ### Redaction Canary
 The tool's test suite includes a "Security Canary" that verifies sentinel PATs are redacted from all summary files and console output.
+

@@ -1,0 +1,45 @@
+{
+    "org": "your-org",
+    "projects": [
+        {
+            "name": "marketing",
+            "repos": [
+                "marketing-site"
+            ]
+        }
+    ],
+    "users": [
+        {
+            "email": "dev@example.com",
+            "patEnvVar": "ADO_PAT"
+        }
+    ],
+    "scale": {
+        "branchesPerRepo": 2,
+        "commitsPerBranch": {
+            "min": 2,
+            "max": 4
+        },
+        "prsPerRepo": 2,
+        "reviewersPerPr": {
+            "min": 0,
+            "max": 0
+        },
+        "commentsPerPr": {
+            "min": 0,
+            "max": 2
+        }
+    },
+    "voteDistribution": {
+        "approve": 0,
+        "approveWithSuggestions": 0,
+        "reject": 0,
+        "noVote": 1
+    },
+    "prOutcomes": {
+        "complete": 0.8,
+        "abandon": 0.1,
+        "leaveOpen": 0.1
+    },
+    "seed": 42
+}
