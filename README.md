@@ -34,6 +34,9 @@ This documentation follows a **Normative vs. Descriptive** architecture. Technic
 npm install && npm run build
 ```
 
+> [!CAUTION]
+> **Your ADO project must already exist.** The seeder creates repos within existing projects, not projects themselves. See [Prerequisites](docs/configuration.md#prerequisites-normative).
+
 ### 2. Configure
 Create a `seed.config.json` (see [Configuration Reference](docs/configuration.md)):
 ```json

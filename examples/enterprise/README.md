@@ -24,6 +24,9 @@ High-volume PR creation can trigger Azure DevOps 429 (Too Many Requests) respons
 
 ## Setup
 
+> [!CAUTION]
+> **Edit `seed.config.json` first** — replace `"your-org"`, project names, and user emails with your actual values. See [Prerequisites](../../docs/configuration.md#prerequisites-normative).
+
 1. Set PATs for all 10 users (or use fewer — adjust the `users` array):
    ```bash
    $env:ADO_PAT_ALICE = "..."
@@ -32,6 +35,9 @@ High-volume PR creation can trigger Azure DevOps 429 (Too Many Requests) respons
    ```
 
 2. Run:
+
+   > ⚠️ **Will fail** if `seed.config.json` still contains placeholders.
+
    ```bash
    npm start -- --config examples/enterprise/seed.config.json --run-id enterprise-1
    ```

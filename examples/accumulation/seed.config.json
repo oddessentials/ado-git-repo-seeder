@@ -2,9 +2,9 @@
     "org": "your-org",
     "projects": [
         {
-            "name": "marketing",
+            "name": "your-project",
             "repos": [
-                "marketing-site"
+                "your-repo"
             ]
         }
     ],

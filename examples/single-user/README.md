@@ -10,6 +10,9 @@ Minimal configuration for a solo developer or quick demo.
 
 ## Setup
 
+> [!CAUTION]
+> **Edit `seed.config.json` first** — replace `"your-org"` with your ADO org and `"your-project"` with an **existing** project name. See [Prerequisites](../../docs/configuration.md#prerequisites-normative).
+
 1. Set your PAT:
    ```bash
    # Windows
@@ -19,6 +22,9 @@ Minimal configuration for a solo developer or quick demo.
    ```
 
 2. Run:
+
+   > ⚠️ **Will fail** if `seed.config.json` still contains placeholders.
+
    ```bash
    npm start -- --config examples/single-user/seed.config.json --run-id demo-1
    ```
