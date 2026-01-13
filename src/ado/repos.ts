@@ -40,8 +40,11 @@ export class RepoManager {
             );
             return response.data;
         } catch (error) {
+            // Check both sanitized error (.status) and raw axios error (.response.status)
+            const status = (error as { status?: number }).status
+                ?? (error as { response?: { status?: number } }).response?.status;
             // ADO returns 404 if repo not found
-            if ((error as { response?: { status?: number } }).response?.status === 404) {
+            if (status === 404) {
                 return null;
             }
             throw error;
