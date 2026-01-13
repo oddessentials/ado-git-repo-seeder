@@ -274,8 +274,25 @@ export class SeedRunner {
                 outcomeApplied: false,
             };
 
+            // Publish draft if planned (90% of drafts get published before operations)
+            let effectivelyDraft = planned.isDraft;
+            if (planned.isDraft && planned.shouldPublishDraft) {
+                try {
+                    await this.prManager.publishDraft(project, repoId, pr.pullRequestId);
+                    effectivelyDraft = false; // Now it's a regular PR
+                } catch (error) {
+                    // Publish failed - treat as lingering draft
+                    failures.push({
+                        phase: 'publish-draft',
+                        prId: pr.pullRequestId,
+                        error: error instanceof Error ? error.message : String(error),
+                        isFatal: false,
+                    });
+                }
+            }
+
             // Add reviewers (non-fatal) - skip for drafts since ADO rejects voting on drafts
-            if (!planned.isDraft) {
+            if (!effectivelyDraft) {
                 for (const reviewer of planned.reviewers) {
                     try {
                         const user = this.config.resolvedUsers.find(u => u.email === reviewer.email);
@@ -342,7 +359,7 @@ export class SeedRunner {
 
             // Apply outcome (non-fatal) - skip for drafts since they can't be completed/abandoned
             try {
-                if (planned.isDraft) {
+                if (effectivelyDraft) {
                     // Draft PRs cannot be completed or abandoned - leave them as-is
                     prResult.outcomeApplied = true; // Skip counts as "applied" for drafts
                 } else if (planned.outcome === 'complete') {

@@ -1,0 +1,814 @@
+{
+  "version": "1.1.0",
+  "runId": "day-2026010",
+  "org": "oddessentials",
+  "startTime": "2026-01-13T21:13:33.545Z",
+  "endTime": "2026-01-13T21:17:40.764Z",
+  "repos": [
+    {
+      "project": "marketing",
+      "repoName": "marketing-site",
+      "repoId": "ae4b0c53-da5b-4f61-98cc-8c45440aa2d3",
+      "resolvedNaming": "direct",
+      "branchesCreated": 8,
+      "prs": [
+        {
+          "prId": 119,
+          "title": "[day-2026010] refactor/day-2026010-7",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [],
+          "comments": 4,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 120,
+          "title": "[day-2026010] hotfix/day-2026010-1",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 121,
+          "title": "[day-2026010] bugfix/day-2026010-6",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            },
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 5,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 122,
+          "title": "[day-2026010] feature/day-2026010-4",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "noVote"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 123,
+          "title": "[day-2026010] chore/day-2026010-5",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "noVote"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 4,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 124,
+          "title": "[day-2026010] chore/day-2026010-2",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        }
+      ],
+      "failures": [
+        {
+          "phase": "add-reviewer",
+          "prId": 119,
+          "error": "Request failed with status code 400",
+          "isFatal": false
+        }
+      ]
+    },
+    {
+      "project": "marketing",
+      "repoName": "marketing-content",
+      "repoId": "3fcb1bd4-36bc-4775-836e-ee20931ddd8c",
+      "resolvedNaming": "direct",
+      "branchesCreated": 8,
+      "prs": [
+        {
+          "prId": 125,
+          "title": "[day-2026010] bugfix/day-2026010-6",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 5,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 126,
+          "title": "[day-2026010] hotfix/day-2026010-7",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 127,
+          "title": "[day-2026010] hotfix/day-2026010-2",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "abandon",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 128,
+          "title": "[day-2026010] feature/day-2026010-1",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 129,
+          "title": "[day-2026010] chore/day-2026010-4",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 2,
+          "followUpCommitsAdded": 2,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 130,
+          "title": "[day-2026010] bugfix/day-2026010-5",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        }
+      ],
+      "failures": []
+    },
+    {
+      "project": "engineering",
+      "repoName": "core-api",
+      "repoId": "2da5ef82-f49f-4751-9c5f-66dfff37e931",
+      "resolvedNaming": "direct",
+      "branchesCreated": 8,
+      "prs": [
+        {
+          "prId": 131,
+          "title": "[day-2026010] refactor/day-2026010-2",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "noVote"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "reject"
+            }
+          ],
+          "comments": 5,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 132,
+          "title": "[day-2026010] feature/day-2026010-4",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 5,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 133,
+          "title": "[day-2026010] feature/day-2026010-6",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 4,
+          "followUpCommitsAdded": 0,
+          "outcome": "abandon",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 134,
+          "title": "[day-2026010] feature/day-2026010-1",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 135,
+          "title": "[day-2026010] chore/day-2026010-5",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 5,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 136,
+          "title": "[day-2026010] feature/day-2026010-3",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 1,
+          "outcome": "complete",
+          "outcomeApplied": true
+        }
+      ],
+      "failures": []
+    },
+    {
+      "project": "engineering",
+      "repoName": "web-app",
+      "repoId": "255d8d56-c407-49ab-9811-f4f7d430e2f2",
+      "resolvedNaming": "direct",
+      "branchesCreated": 8,
+      "prs": [
+        {
+          "prId": 137,
+          "title": "[day-2026010] hotfix/day-2026010-4",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 138,
+          "title": "[day-2026010] feature/day-2026010-2",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": false
+        },
+        {
+          "prId": 139,
+          "title": "[day-2026010] bugfix/day-2026010-0",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 140,
+          "title": "[day-2026010] feature/day-2026010-3",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "reject"
+            }
+          ],
+          "comments": 4,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 141,
+          "title": "[day-2026010] feature/day-2026010-1",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 2,
+          "followUpCommitsAdded": 0,
+          "outcome": "abandon",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 142,
+          "title": "[day-2026010] refactor/day-2026010-5",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "noVote"
+            },
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        }
+      ],
+      "failures": [
+        {
+          "phase": "add-reviewer",
+          "prId": 138,
+          "error": "Request failed with status code 400",
+          "isFatal": false
+        },
+        {
+          "phase": "add-reviewer",
+          "prId": 138,
+          "error": "Request failed with status code 400",
+          "isFatal": false
+        },
+        {
+          "phase": "apply-outcome",
+          "prId": 138,
+          "error": "Request failed with status code 500",
+          "isFatal": false
+        }
+      ]
+    },
+    {
+      "project": "engineering",
+      "repoName": "infra",
+      "repoId": "31d690cc-4d0a-4349-b8d9-94460a95ed84",
+      "resolvedNaming": "direct",
+      "branchesCreated": 8,
+      "prs": [
+        {
+          "prId": 143,
+          "title": "[day-2026010] feature/day-2026010-1",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "reject"
+            }
+          ],
+          "comments": 4,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 144,
+          "title": "[day-2026010] feature/day-2026010-3",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "reject"
+            },
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 5,
+          "followUpCommitsAdded": 0,
+          "outcome": "abandon",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 145,
+          "title": "[day-2026010] feature/day-2026010-5",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 146,
+          "title": "[day-2026010] chore/day-2026010-2",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "abandon",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 147,
+          "title": "[day-2026010] chore/day-2026010-7",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "noVote"
+            },
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 2,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 148,
+          "title": "[day-2026010] bugfix/day-2026010-0",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "reject"
+            },
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 4,
+          "followUpCommitsAdded": 2,
+          "outcome": "abandon",
+          "outcomeApplied": true
+        }
+      ],
+      "failures": []
+    },
+    {
+      "project": "hospitality",
+      "repoName": "booking-system",
+      "repoId": "de372e6a-db50-435a-8aaf-00711ebcfb88",
+      "resolvedNaming": "direct",
+      "branchesCreated": 8,
+      "prs": [
+        {
+          "prId": 149,
+          "title": "[day-2026010] chore/day-2026010-5",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 3,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 150,
+          "title": "[day-2026010] hotfix/day-2026010-2",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "reject"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "abandon",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 151,
+          "title": "[day-2026010] hotfix/day-2026010-0",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approveWithSuggestions"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 2,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 152,
+          "title": "[day-2026010] refactor/day-2026010-6",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "noVote"
+            },
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "abandon",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 153,
+          "title": "[day-2026010] bugfix/day-2026010-3",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 154,
+          "title": "[day-2026010] chore/day-2026010-7",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        }
+      ],
+      "failures": []
+    },
+    {
+      "project": "hospitality",
+      "repoName": "guest-portal",
+      "repoId": "6e863e65-8d70-459a-8697-415197f34628",
+      "resolvedNaming": "direct",
+      "branchesCreated": 8,
+      "prs": [
+        {
+          "prId": 155,
+          "title": "[day-2026010] hotfix/day-2026010-7",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 2,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 156,
+          "title": "[day-2026010] feature/day-2026010-2",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approveWithSuggestions"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 5,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 157,
+          "title": "[day-2026010] feature/day-2026010-0",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 4,
+          "followUpCommitsAdded": 2,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 158,
+          "title": "[day-2026010] refactor/day-2026010-3",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 5,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 159,
+          "title": "[day-2026010] hotfix/day-2026010-5",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 160,
+          "title": "[day-2026010] hotfix/day-2026010-6",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            },
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "reject"
+            }
+          ],
+          "comments": 2,
+          "followUpCommitsAdded": 2,
+          "outcome": "complete",
+          "outcomeApplied": true
+        }
+      ],
+      "failures": []
+    }
+  ],
+  "fatalFailure": null
+}

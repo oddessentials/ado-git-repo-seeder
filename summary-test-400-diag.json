@@ -1,0 +1,814 @@
+{
+  "version": "1.1.0",
+  "runId": "test-400-diag",
+  "org": "oddessentials",
+  "startTime": "2026-01-13T21:24:26.903Z",
+  "endTime": "2026-01-13T21:28:35.520Z",
+  "repos": [
+    {
+      "project": "marketing",
+      "repoName": "marketing-site",
+      "repoId": "ae4b0c53-da5b-4f61-98cc-8c45440aa2d3",
+      "resolvedNaming": "direct",
+      "branchesCreated": 8,
+      "prs": [
+        {
+          "prId": 161,
+          "title": "[test-400-diag] refactor/test-400-diag-7",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [],
+          "comments": 4,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 162,
+          "title": "[test-400-diag] hotfix/test-400-diag-1",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 163,
+          "title": "[test-400-diag] bugfix/test-400-diag-6",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            },
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 5,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 164,
+          "title": "[test-400-diag] feature/test-400-diag-4",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "noVote"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 165,
+          "title": "[test-400-diag] chore/test-400-diag-5",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "noVote"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 4,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 166,
+          "title": "[test-400-diag] chore/test-400-diag-2",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        }
+      ],
+      "failures": [
+        {
+          "phase": "add-reviewer",
+          "prId": 161,
+          "error": "Request failed with status code 400 - {\"$id\":\"1\",\"innerException\":null,\"message\":\"You cannot vote on draft pull requests.\",\"typeName\":\"Microsoft.TeamFoundation.Git.Server.GitPullRequestDraftCannotVoteException, Microsoft.TeamFoundation.Git.Server\",\"typeKey\":\"GitPullRequestDraftCannotVoteException\",\"errorCode\":0,\"eventId\":3000}",
+          "isFatal": false
+        }
+      ]
+    },
+    {
+      "project": "marketing",
+      "repoName": "marketing-content",
+      "repoId": "3fcb1bd4-36bc-4775-836e-ee20931ddd8c",
+      "resolvedNaming": "direct",
+      "branchesCreated": 8,
+      "prs": [
+        {
+          "prId": 167,
+          "title": "[test-400-diag] bugfix/test-400-diag-6",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 5,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 168,
+          "title": "[test-400-diag] hotfix/test-400-diag-7",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 169,
+          "title": "[test-400-diag] hotfix/test-400-diag-2",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "abandon",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 170,
+          "title": "[test-400-diag] feature/test-400-diag-1",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 171,
+          "title": "[test-400-diag] chore/test-400-diag-4",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 2,
+          "followUpCommitsAdded": 2,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 172,
+          "title": "[test-400-diag] bugfix/test-400-diag-5",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        }
+      ],
+      "failures": []
+    },
+    {
+      "project": "engineering",
+      "repoName": "core-api",
+      "repoId": "2da5ef82-f49f-4751-9c5f-66dfff37e931",
+      "resolvedNaming": "direct",
+      "branchesCreated": 8,
+      "prs": [
+        {
+          "prId": 173,
+          "title": "[test-400-diag] refactor/test-400-diag-2",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "noVote"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "reject"
+            }
+          ],
+          "comments": 5,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 174,
+          "title": "[test-400-diag] feature/test-400-diag-4",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 5,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 175,
+          "title": "[test-400-diag] feature/test-400-diag-6",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 4,
+          "followUpCommitsAdded": 0,
+          "outcome": "abandon",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 176,
+          "title": "[test-400-diag] feature/test-400-diag-1",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 177,
+          "title": "[test-400-diag] chore/test-400-diag-5",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 5,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 178,
+          "title": "[test-400-diag] feature/test-400-diag-3",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 1,
+          "outcome": "complete",
+          "outcomeApplied": true
+        }
+      ],
+      "failures": []
+    },
+    {
+      "project": "engineering",
+      "repoName": "web-app",
+      "repoId": "255d8d56-c407-49ab-9811-f4f7d430e2f2",
+      "resolvedNaming": "direct",
+      "branchesCreated": 8,
+      "prs": [
+        {
+          "prId": 179,
+          "title": "[test-400-diag] hotfix/test-400-diag-4",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 180,
+          "title": "[test-400-diag] feature/test-400-diag-2",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": false
+        },
+        {
+          "prId": 181,
+          "title": "[test-400-diag] bugfix/test-400-diag-0",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 182,
+          "title": "[test-400-diag] feature/test-400-diag-3",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "reject"
+            }
+          ],
+          "comments": 4,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 183,
+          "title": "[test-400-diag] feature/test-400-diag-1",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 2,
+          "followUpCommitsAdded": 0,
+          "outcome": "abandon",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 184,
+          "title": "[test-400-diag] refactor/test-400-diag-5",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "noVote"
+            },
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        }
+      ],
+      "failures": [
+        {
+          "phase": "add-reviewer",
+          "prId": 180,
+          "error": "Request failed with status code 400 - {\"$id\":\"1\",\"innerException\":null,\"message\":\"You cannot vote on draft pull requests.\",\"typeName\":\"Microsoft.TeamFoundation.Git.Server.GitPullRequestDraftCannotVoteException, Microsoft.TeamFoundation.Git.Server\",\"typeKey\":\"GitPullRequestDraftCannotVoteException\",\"errorCode\":0,\"eventId\":3000}",
+          "isFatal": false
+        },
+        {
+          "phase": "add-reviewer",
+          "prId": 180,
+          "error": "Request failed with status code 400 - {\"$id\":\"1\",\"innerException\":null,\"message\":\"You cannot vote on draft pull requests.\",\"typeName\":\"Microsoft.TeamFoundation.Git.Server.GitPullRequestDraftCannotVoteException, Microsoft.TeamFoundation.Git.Server\",\"typeKey\":\"GitPullRequestDraftCannotVoteException\",\"errorCode\":0,\"eventId\":3000}",
+          "isFatal": false
+        },
+        {
+          "phase": "apply-outcome",
+          "prId": 180,
+          "error": "Request failed with status code 500",
+          "isFatal": false
+        }
+      ]
+    },
+    {
+      "project": "engineering",
+      "repoName": "infra",
+      "repoId": "31d690cc-4d0a-4349-b8d9-94460a95ed84",
+      "resolvedNaming": "direct",
+      "branchesCreated": 8,
+      "prs": [
+        {
+          "prId": 185,
+          "title": "[test-400-diag] feature/test-400-diag-1",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "reject"
+            }
+          ],
+          "comments": 4,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 186,
+          "title": "[test-400-diag] feature/test-400-diag-3",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "reject"
+            },
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 5,
+          "followUpCommitsAdded": 0,
+          "outcome": "abandon",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 187,
+          "title": "[test-400-diag] feature/test-400-diag-5",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 188,
+          "title": "[test-400-diag] chore/test-400-diag-2",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "abandon",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 189,
+          "title": "[test-400-diag] chore/test-400-diag-7",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "noVote"
+            },
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 2,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 190,
+          "title": "[test-400-diag] bugfix/test-400-diag-0",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "reject"
+            },
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 4,
+          "followUpCommitsAdded": 2,
+          "outcome": "abandon",
+          "outcomeApplied": true
+        }
+      ],
+      "failures": []
+    },
+    {
+      "project": "hospitality",
+      "repoName": "booking-system",
+      "repoId": "de372e6a-db50-435a-8aaf-00711ebcfb88",
+      "resolvedNaming": "direct",
+      "branchesCreated": 8,
+      "prs": [
+        {
+          "prId": 191,
+          "title": "[test-400-diag] chore/test-400-diag-5",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 3,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 192,
+          "title": "[test-400-diag] hotfix/test-400-diag-2",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "reject"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 6,
+          "followUpCommitsAdded": 0,
+          "outcome": "abandon",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 193,
+          "title": "[test-400-diag] hotfix/test-400-diag-0",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approveWithSuggestions"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 2,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 194,
+          "title": "[test-400-diag] refactor/test-400-diag-6",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "noVote"
+            },
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "abandon",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 195,
+          "title": "[test-400-diag] bugfix/test-400-diag-3",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 196,
+          "title": "[test-400-diag] chore/test-400-diag-7",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        }
+      ],
+      "failures": []
+    },
+    {
+      "project": "hospitality",
+      "repoName": "guest-portal",
+      "repoId": "6e863e65-8d70-459a-8697-415197f34628",
+      "resolvedNaming": "direct",
+      "branchesCreated": 8,
+      "prs": [
+        {
+          "prId": 197,
+          "title": "[test-400-diag] hotfix/test-400-diag-7",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 2,
+          "followUpCommitsAdded": 0,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 198,
+          "title": "[test-400-diag] feature/test-400-diag-2",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "approveWithSuggestions"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approveWithSuggestions"
+            }
+          ],
+          "comments": 5,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 199,
+          "title": "[test-400-diag] feature/test-400-diag-0",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            },
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "noVote"
+            }
+          ],
+          "comments": 4,
+          "followUpCommitsAdded": 2,
+          "outcome": "complete",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 200,
+          "title": "[test-400-diag] refactor/test-400-diag-3",
+          "creator": "admin@oddessentials.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 5,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 201,
+          "title": "[test-400-diag] hotfix/test-400-diag-5",
+          "creator": "petepalles@gmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@hotmail.com",
+              "vote": "approve"
+            }
+          ],
+          "comments": 3,
+          "followUpCommitsAdded": 0,
+          "outcome": "leaveOpen",
+          "outcomeApplied": true
+        },
+        {
+          "prId": 202,
+          "title": "[test-400-diag] hotfix/test-400-diag-6",
+          "creator": "petepalles@hotmail.com",
+          "reviewers": [
+            {
+              "email": "petepalles@gmail.com",
+              "vote": "approve"
+            },
+            {
+              "email": "admin@oddessentials.com",
+              "vote": "reject"
+            }
+          ],
+          "comments": 2,
+          "followUpCommitsAdded": 2,
+          "outcome": "complete",
+          "outcomeApplied": true
+        }
+      ],
+      "failures": []
+    }
+  ],
+  "fatalFailure": null
+}
