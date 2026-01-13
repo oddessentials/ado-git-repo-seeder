@@ -40,9 +40,14 @@ async function runSmokeTest() {
             repos: [repo],
             repoNaming: 'direct'
         }],
+        users: [{
+            email: 'smoke-test@example.com',
+            patEnvVar: 'ADO_PAT'
+        }],
         resolvedUsers: [{
             email: 'smoke-test@example.com', // Dummy email, PAT is what matters
-            pat
+            pat,
+            patEnvVar: 'ADO_PAT'
         }],
         seed: Date.now(),
         runId: `smoke-${Math.floor(Math.random() * 1000)}`,
@@ -83,7 +88,6 @@ async function runSmokeTest() {
                 outcome: 'leaveOpen',
                 followUpCommits: 0
             }],
-            outcome: 'leaveOpen'
         }]
     };
 
