@@ -2,6 +2,20 @@
 
 This document is the **normative contract** for the `ado-git-repo-seeder` configuration. All other documentation (README, guides) must defer to this reference.
 
+## Prerequisites (Normative)
+
+> [!CAUTION]
+> **Mandatory** requirements before running the seeder:
+>
+> 1. **ADO projects must already exist** — The seeder creates repositories within existing Azure DevOps projects. It does NOT create projects.
+> 2. **Project names are case-sensitive** — `marketing` ≠ `Marketing`. Mismatched case causes `404 project not found` errors.
+> 3. **PAT scopes (mandatory)**:
+>    - `Code (Read, Write & Manage)`
+>    - `Identity (Read)`
+
+---
+
+
 ## Identity & Authentication
 
 ### `org` (string, required)

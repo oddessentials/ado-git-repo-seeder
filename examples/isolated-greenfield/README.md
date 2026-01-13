@@ -19,12 +19,18 @@ Each run is **completely independent** — no collision risk.
 
 ## Setup
 
+> [!CAUTION]
+> **Edit `seed.config.json` first** — replace `"your-org"` and `"your-project"` with your actual values. See [Prerequisites](../../docs/configuration.md#prerequisites-normative).
+
 1. Set your PAT:
    ```bash
    $env:ADO_PAT = "your-token"
    ```
 
 2. Run:
+
+   > ⚠️ **Will fail** if `seed.config.json` still contains placeholders.
+
    ```bash
    npm start -- --config examples/isolated-greenfield/seed.config.json --run-id demo-1
    ```

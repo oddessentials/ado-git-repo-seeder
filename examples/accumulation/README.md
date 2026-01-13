@@ -26,6 +26,14 @@ Both runs add activity to the **same** `marketing-site` repo.
 
 ## Setup
 
+> [!CAUTION]
+> **This example will fail unless you edit `seed.config.json` first:**
+> - Replace `"your-org"` with your ADO organization name
+> - Replace `"marketing"` with an **existing** ADO project name (case-sensitive!)
+> - Replace user emails with actual ADO user emails
+>
+> See [Prerequisites](../../docs/configuration.md#prerequisites-normative) for mandatory requirements.
+
 1. Set PATs:
    ```bash
    $env:ADO_PAT_DEV1 = "your-token"
@@ -33,6 +41,9 @@ Both runs add activity to the **same** `marketing-site` repo.
    ```
 
 2. Run sequentially with incrementing `runId`:
+
+   > ⚠️ **The commands below will fail** if `seed.config.json` still contains `"your-org"`.
+
    ```bash
    npm start -- --config examples/accumulation/seed.config.json --run-id day-1
    npm start -- --config examples/accumulation/seed.config.json --run-id day-2

@@ -10,6 +10,9 @@
 
 ## Setup
 
+> [!CAUTION]
+> **Edit `seed.config.json` first** — replace `"your-org"`, project names, and user emails with your actual values. See [Prerequisites](../../docs/configuration.md#prerequisites-normative).
+
 1. Set PATs for each user:
    ```bash
    # Windows
@@ -21,6 +24,9 @@
    ```
 
 2. Run:
+
+   > ⚠️ **Will fail** if `seed.config.json` still contains placeholders.
+
    ```bash
    npm start -- --config examples/multi-user-team/seed.config.json --run-id sprint-1
    ```
