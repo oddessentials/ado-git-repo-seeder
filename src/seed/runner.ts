@@ -340,9 +340,12 @@ export class SeedRunner {
                 }
             }
 
-            // Apply outcome (non-fatal)
+            // Apply outcome (non-fatal) - skip for drafts since they can't be completed/abandoned
             try {
-                if (planned.outcome === 'complete') {
+                if (planned.isDraft) {
+                    // Draft PRs cannot be completed or abandoned - leave them as-is
+                    prResult.outcomeApplied = true; // Skip counts as "applied" for drafts
+                } else if (planned.outcome === 'complete') {
                     // Robust completion with retry for 409
                     let retries = 0;
                     const maxPrRetries = 2;
