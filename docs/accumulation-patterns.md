@@ -1,53 +1,50 @@
-# Multi-Run Accumulation Patterns (Canonical Guide v1.1.0)
+# Multi-Run Accumulation (Normative Contract v1.1.0)
 
-The ADO Git Repo Seeder is designed to support multi-day activity simulation through idempotent runs. This guide explains how to use `repoNaming: direct` and `runId` to accumulate activity safely.
+This document defines the **normative contract** for multi-run activity accumulation in the `ado-git-repo-seeder`.
+
+## Core Principle
+
+To simulate multiple days of development activity on a stable set of repositories, you must maintain a fixed **Project/Repo structure** while simulating time-series activity through incrementing **Run IDs**.
+
+---
 
 ## The "Golden" Accumulation Strategy
 
-To simulate multiple days of activity on the same repository, use the same repository name but **increment the Run ID** (and keep the global seed fixed).
-
-### Day 1: Initial Seeding
-Config (`seed.config.json`):
+### 1. Unified Configuration
+Maintain a single `seed.config.json` with a fixed `seed` value.
 ```json
 {
   "seed": 12345,
   "repoNaming": "direct",
-  "projects": [
-    {
-      "name": "ProjectAlpha",
-      "repos": ["MainService"]
-    }
-  ]
+  "projects": [{ "name": "App", "repos": ["ServiceA"] }]
 }
 ```
-Command:
-```bash
-npm start -- --run-id day-1
-```
-Result: `MainService` is created. 1 PR is opened with branches named `.../day-1-0`.
 
-### Day 2: Accumulating Activity
-Keep the config identical (specifically the `seed`).
-Command:
-```bash
-npm start -- --run-id day-2
-```
-Result: `MainService` already exists, so it is reused. New activity is pushed to branches named `.../day-2-0`. A second PR is opened.
+### 2. Time-Series Execution
+Execute the tool once per simulated "day", passing a unique `--run-id` for each execution.
+
+- **Day 1**: `npm start -- --run-id day-1`
+- **Day 2**: `npm start -- --run-id day-2`
+
+### 3. Identity Resolution
+Each run independently resolves user identities. To simulate the same developers working across multiple days, ensure your `seed.config.json` contains consistent email addresses across runs.
 
 ---
 
-## Why this is Safe
+## Idempotency and Safety (Normative)
 
-### 1. Fixed Seeding
-By keeping the `seed` fixed in the config, the tool generates deterministic but **unique** branch names and commit content for each `runId`. 
-- `runId: day-1` -> `branch: feature/day-1-0`
-- `runId: day-2` -> `branch: feature/day-2-0`
+### Collision Prevention
+The tool enforces strict physical isolation between runs via branch naming. 
+- Branches for `day-1` are prefixed `.../day-1-0`.
+- Branches for `day-2` are prefixed `.../day-2-0`.
 
-### 2. Collision Guard
-If you accidentally run `day-1` again on the same repo, the tool will perform a `git ls-remote` check. It will see `feature/day-1-0` already exists on the server and will terminate with a **FATAL ERROR** to prevent corruption.
+> [!CAUTION]
+> As per the [Configuration Reference](configuration.md), re-running the tool with an **identical `runId`** on a repository that already contains that run's activity is a **FATAL ERROR**.
 
-### 3. Idempotent PRs
-Since branch names include the `runId`, the PRs are naturally idempotent per run. 
+### PR Continuity
+Each run creates its own set of Pull Requests. The `runId` is injected into the PR title and description to ensure traceability and distinguish Day 1 activity from Day 2 activity on the same repository.
 
-## Activity-Only Mode
-If you want to run PR activity against repositories that already existed *before* you started using the seeder, use `repoNaming: direct` and ensure your `seed.config.json` listed repo names EXACTLY match ADO.
+---
+
+## Deferral
+For exhaustive details on the `runId` CLI flag and `repoNaming` schema, defer to the [Configuration Reference](configuration.md).
