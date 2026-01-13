@@ -1,0 +1,70 @@
+{
+    "$schema": "https://json.schemastore.org/seed.config.json",
+    "org": "your-org-name",
+    "projects": [
+        {
+            "name": "marketing",
+            "repos": [
+                "marketing-site",
+                "marketing-content"
+            ]
+        },
+        {
+            "name": "engineering",
+            "repos": [
+                "core-api",
+                "web-app",
+                "infra"
+            ]
+        },
+        {
+            "name": "hospitality",
+            "repos": [
+                "booking-system",
+                "guest-portal"
+            ]
+        }
+    ],
+    "users": [
+        {
+            "email": "dev1@example.com",
+            "patEnvVar": "ADO_PAT_DEV1"
+        },
+        {
+            "email": "dev2@example.com",
+            "patEnvVar": "ADO_PAT_DEV2"
+        },
+        {
+            "email": "dev3@example.com",
+            "patEnvVar": "ADO_PAT_DEV3"
+        }
+    ],
+    "scale": {
+        "branchesPerRepo": 5,
+        "commitsPerBranch": {
+            "min": 3,
+            "max": 10
+        },
+        "prsPerRepo": 4,
+        "reviewersPerPr": {
+            "min": 1,
+            "max": 2
+        },
+        "commentsPerPr": {
+            "min": 1,
+            "max": 5
+        }
+    },
+    "voteDistribution": {
+        "approve": 0.5,
+        "approveWithSuggestions": 0.2,
+        "reject": 0.1,
+        "noVote": 0.2
+    },
+    "prOutcomes": {
+        "complete": 0.6,
+        "abandon": 0.2,
+        "leaveOpen": 0.2
+    },
+    "seed": 12345
+}
