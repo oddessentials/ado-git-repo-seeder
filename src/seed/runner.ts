@@ -153,11 +153,12 @@ export class SeedRunner {
 
         try {
             // Create/ensure repo exists
-            const repo = await this.repoManager.ensureRepo(planned.project, planned.repoName, this.config.repoStrategy);
-            if (!repo) {
-                // Skiped or recorded warning elsewhere (though RepoResult needs to show it)
+            const repoResult = await this.repoManager.ensureRepo(planned.project, planned.repoName, this.config.repoStrategy);
+            if (!repoResult) {
+                // Skipped or recorded warning elsewhere (though RepoResult needs to show it)
                 return result;
             }
+            const { repo, isNew } = repoResult;
             result.repoId = repo.id;
 
             // Generate and push git content (FATAL on failure)
@@ -195,11 +196,14 @@ export class SeedRunner {
                     throw new Error(`FATAL: Collision detected on branches: ${collisions.join(', ')}. This runId has already been used for this repository.`);
                 }
 
+                // Skip pushing main for existing repos (accumulation mode)
+                // New repos need main pushed; existing repos already have main
                 await this.gitGenerator.pushToRemote(
                     generated.localPath,
                     repo.remoteUrl,
                     primaryUser.pat,
-                    generated.branches
+                    generated.branches,
+                    !isNew // skipMainPush = true for existing repos
                 );
                 result.branchesCreated = generated.branches.length;
             } finally {

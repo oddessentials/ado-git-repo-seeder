@@ -120,12 +120,14 @@ export class GitGenerator {
     /**
      * Pushes all branches to a remote ADO repository.
      * PAT is injected in-memory only (never persisted to .git/config).
+     * @param skipMainPush - If true, skips pushing main (for existing repos in accumulation mode)
      */
     async pushToRemote(
         localPath: string,
         remoteUrl: string,
         pat: string,
-        branches: string[]
+        branches: string[],
+        skipMainPush: boolean = false
     ): Promise<void> {
         // Use non-secret username in URL
         const url = new URL(remoteUrl);
@@ -138,8 +140,10 @@ export class GitGenerator {
         try {
             const env = { GIT_ASKPASS: askPass.path };
 
-            // Push main first
-            await this.git(localPath, ['push', cleanUrl, 'main'], true, env);
+            // Push main first (unless skipping for existing repos)
+            if (!skipMainPush) {
+                await this.git(localPath, ['push', cleanUrl, 'main'], true, env);
+            }
 
             // Push all feature branches
             for (const branch of branches) {
