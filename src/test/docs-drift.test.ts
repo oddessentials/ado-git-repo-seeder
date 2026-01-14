@@ -30,7 +30,7 @@ describe('Documentation Drift Guard', () => {
             'repoNaming',
             'repoStrategy',
             'branchStrategy',
-            'activity'
+            'activity',
         ];
 
         for (const field of fields) {
@@ -44,11 +44,7 @@ describe('Documentation Drift Guard', () => {
     it('docs/configuration.md should mention critical CLI flags', () => {
         const cliTs = readFileSync(cliTsPath, 'utf-8');
 
-        const criticalFlags = [
-            'run-id',
-            'config',
-            'dry-run'
-        ];
+        const criticalFlags = ['run-id', 'config', 'dry-run'];
 
         for (const flag of criticalFlags) {
             // Check for flag with or without hyphens (run-id vs runId)
@@ -61,7 +57,7 @@ describe('Documentation Drift Guard', () => {
 
     it('all docs in docs/ should have v1.1.0 or later version stamp', () => {
         const docsDir = join(rootDir, 'docs');
-        const files = readdirSync(docsDir).filter(f => f.endsWith('.md'));
+        const files = readdirSync(docsDir).filter((f) => f.endsWith('.md'));
 
         for (const file of files) {
             const content = readFileSync(join(docsDir, file), 'utf-8');

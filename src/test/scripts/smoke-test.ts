@@ -5,12 +5,12 @@ import 'dotenv/config';
 
 /**
  * E2E Smoke Test for ADO Git Repo Seeder
- * 
+ *
  * Validates:
  * 1. Connectivity to ADO PR and Repo APIs
  * 2. GIT_ASKPASS authentication on the host environment
  * 3. PR creation success
- * 
+ *
  * Usage:
  * export ADO_PAT=your-pat
  * export ADO_ORG=your-org
@@ -35,20 +35,26 @@ async function runSmokeTest() {
 
     const config: LoadedConfig = {
         org,
-        projects: [{
-            name: project,
-            repos: [repo],
-            repoNaming: 'direct'
-        }],
-        users: [{
-            email: 'smoke-test@example.com',
-            patEnvVar: 'ADO_PAT'
-        }],
-        resolvedUsers: [{
-            email: 'smoke-test@example.com', // Dummy email, PAT is what matters
-            pat,
-            patEnvVar: 'ADO_PAT'
-        }],
+        projects: [
+            {
+                name: project,
+                repos: [repo],
+                repoNaming: 'direct',
+            },
+        ],
+        users: [
+            {
+                email: 'smoke-test@example.com',
+                patEnvVar: 'ADO_PAT',
+            },
+        ],
+        resolvedUsers: [
+            {
+                email: 'smoke-test@example.com', // Dummy email, PAT is what matters
+                pat,
+                patEnvVar: 'ADO_PAT',
+            },
+        ],
         seed: Date.now(),
         runId: `smoke-${Math.floor(Math.random() * 1000)}`,
         repoNaming: 'direct',
@@ -59,37 +65,43 @@ async function runSmokeTest() {
             commitsPerBranch: { min: 1, max: 1 },
             prsPerRepo: 1,
             reviewersPerPr: { min: 0, max: 0 },
-            commentsPerPr: { min: 0, max: 0 }
+            commentsPerPr: { min: 0, max: 0 },
         },
         voteDistribution: { approve: 1, approveWithSuggestions: 0, reject: 0, noVote: 0 },
         prOutcomes: { complete: 0, abandon: 0, leaveOpen: 1 },
-        activity: { pushFollowUpCommits: 0, followUpCommitsRange: { min: 0, max: 0 } }
+        activity: { pushFollowUpCommits: 0, followUpCommitsRange: { min: 0, max: 0 } },
     };
 
     const plan: SeedPlan = {
         runId: config.runId,
         org: config.org,
-        repos: [{
-            project,
-            repoName: repo,
-            resolvedNaming: 'direct',
-            branches: [{
-                name: `smoke/${config.runId}`,
-                commits: 1
-            }],
-            prs: [{
-                sourceBranch: `smoke/${config.runId}`,
-                creatorEmail: config.resolvedUsers[0].email,
-                title: `[SMOKE TEST] ${config.runId}`,
-                description: 'End-to-end smoke test for GIT_ASKPASS validation.',
-                isDraft: false,
-                shouldPublishDraft: false,
-                reviewers: [],
-                comments: [],
-                outcome: 'leaveOpen',
-                followUpCommits: 0
-            }],
-        }]
+        repos: [
+            {
+                project,
+                repoName: repo,
+                resolvedNaming: 'direct',
+                branches: [
+                    {
+                        name: `smoke/${config.runId}`,
+                        commits: 1,
+                    },
+                ],
+                prs: [
+                    {
+                        sourceBranch: `smoke/${config.runId}`,
+                        creatorEmail: config.resolvedUsers[0].email,
+                        title: `[SMOKE TEST] ${config.runId}`,
+                        description: 'End-to-end smoke test for GIT_ASKPASS validation.',
+                        isDraft: false,
+                        shouldPublishDraft: false,
+                        reviewers: [],
+                        comments: [],
+                        outcome: 'leaveOpen',
+                        followUpCommits: 0,
+                    },
+                ],
+            },
+        ],
     };
 
     const runner = new SeedRunner(config, plan, undefined, 'smoke-test');
@@ -105,7 +117,7 @@ async function runSmokeTest() {
         const repoResult = summary.repos[0];
         if (repoResult.failures.length > 0) {
             console.error('❌ Smoke Test Completed with individual failures:');
-            repoResult.failures.forEach(f => console.error(`   - [${f.phase}]: ${f.error}`));
+            repoResult.failures.forEach((f) => console.error(`   - [${f.phase}]: ${f.error}`));
             process.exit(1);
         }
 

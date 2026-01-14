@@ -39,15 +39,14 @@ export class RepoManager {
      */
     async getRepo(project: string, repoName: string): Promise<AdoRepo | null> {
         try {
-            const response = await this.client.get(
-                `/${project}/_apis/git/repositories/${repoName}`,
-                { params: { 'api-version': '7.1' } }
-            );
+            const response = await this.client.get(`/${project}/_apis/git/repositories/${repoName}`, {
+                params: { 'api-version': '7.1' },
+            });
             return response.data;
         } catch (error) {
             // Check both sanitized error (.status) and raw axios error (.response.status)
-            const status = (error as { status?: number }).status
-                ?? (error as { response?: { status?: number } }).response?.status;
+            const status =
+                (error as { status?: number }).status ?? (error as { response?: { status?: number } }).response?.status;
             // ADO returns 404 if repo not found
             if (status === 404) {
                 return null;
@@ -84,7 +83,9 @@ export class RepoManager {
 
         if (!strategy.createIfMissing) {
             if (strategy.failIfMissing) {
-                throw new Error(`FATAL: Repository '${repoName}' does not exist in project '${project}' and createIfMissing is false.`);
+                throw new Error(
+                    `FATAL: Repository '${repoName}' does not exist in project '${project}' and createIfMissing is false.`
+                );
             }
             return null;
         }

@@ -54,7 +54,7 @@ describe('planner', () => {
             const plan = createPlan(config);
 
             expect(plan.repos).toHaveLength(3); // repo1, repo2, repo3
-            expect(plan.repos.map(r => r.project)).toEqual(['project1', 'project1', 'project2']);
+            expect(plan.repos.map((r) => r.project)).toEqual(['project1', 'project1', 'project2']);
         });
 
         it('includes runId in repo names for isolation strategy', () => {
@@ -71,7 +71,7 @@ describe('planner', () => {
             const config = createTestConfig({ runId: 'direct-test', repoNaming: 'direct' });
             const plan = createPlan(config);
 
-            expect(plan.repos.find(r => r.project === 'project1' && r.repoName === 'repo1')).toBeDefined();
+            expect(plan.repos.find((r) => r.project === 'project1' && r.repoName === 'repo1')).toBeDefined();
             expect(plan.repos[0].resolvedNaming).toBe('direct');
         });
 
@@ -80,13 +80,13 @@ describe('planner', () => {
                 repoNaming: 'isolated',
                 projects: [
                     { name: 'p1', repos: ['r1'], repoNaming: 'direct' },
-                    { name: 'p2', repos: ['r2'] }
-                ]
+                    { name: 'p2', repos: ['r2'] },
+                ],
             });
             const plan = createPlan(config);
 
-            const r1 = plan.repos.find(r => r.project === 'p1');
-            const r2 = plan.repos.find(r => r.project === 'p2');
+            const r1 = plan.repos.find((r) => r.project === 'p1');
+            const r2 = plan.repos.find((r) => r.project === 'p2');
 
             expect(r1?.repoName).toBe('r1');
             expect(r1?.resolvedNaming).toBe('direct');
@@ -100,17 +100,14 @@ describe('planner', () => {
                 projects: [
                     {
                         name: 'p1',
-                        repos: [
-                            'r1',
-                            { name: 'r2', repoNaming: 'direct' }
-                        ]
-                    }
-                ]
+                        repos: ['r1', { name: 'r2', repoNaming: 'direct' }],
+                    },
+                ],
             });
             const plan = createPlan(config);
 
-            const r1 = plan.repos.find(r => r.repoName.startsWith('r1-'));
-            const r2 = plan.repos.find(r => r.repoName === 'r2');
+            const r1 = plan.repos.find((r) => r.repoName.startsWith('r1-'));
+            const r2 = plan.repos.find((r) => r.repoName === 'r2');
 
             expect(r1).toBeDefined();
             expect(r2).toBeDefined();
@@ -141,7 +138,7 @@ describe('planner', () => {
 
             for (const repo of plan.repos) {
                 for (const pr of repo.prs) {
-                    const reviewerEmails = pr.reviewers.map(r => r.email);
+                    const reviewerEmails = pr.reviewers.map((r) => r.email);
                     expect(reviewerEmails).not.toContain(pr.creatorEmail);
                 }
             }
@@ -155,16 +152,16 @@ describe('planner', () => {
             const plan2 = createPlan(config2);
 
             // Compare repo structure
-            expect(plan1.repos.map(r => r.repoName)).toEqual(plan2.repos.map(r => r.repoName));
+            expect(plan1.repos.map((r) => r.repoName)).toEqual(plan2.repos.map((r) => r.repoName));
 
             // Compare PR creators
-            const creators1 = plan1.repos.flatMap(r => r.prs.map(p => p.creatorEmail));
-            const creators2 = plan2.repos.flatMap(r => r.prs.map(p => p.creatorEmail));
+            const creators1 = plan1.repos.flatMap((r) => r.prs.map((p) => p.creatorEmail));
+            const creators2 = plan2.repos.flatMap((r) => r.prs.map((p) => p.creatorEmail));
             expect(creators1).toEqual(creators2);
 
             // Compare outcomes
-            const outcomes1 = plan1.repos.flatMap(r => r.prs.map(p => p.outcome));
-            const outcomes2 = plan2.repos.flatMap(r => r.prs.map(p => p.outcome));
+            const outcomes1 = plan1.repos.flatMap((r) => r.prs.map((p) => p.outcome));
+            const outcomes2 = plan2.repos.flatMap((r) => r.prs.map((p) => p.outcome));
             expect(outcomes1).toEqual(outcomes2);
         });
 
@@ -176,8 +173,8 @@ describe('planner', () => {
             const plan2 = createPlan(config2);
 
             // Creators should differ (with high probability)
-            const creators1 = plan1.repos.flatMap(r => r.prs.map(p => p.creatorEmail));
-            const creators2 = plan2.repos.flatMap(r => r.prs.map(p => p.creatorEmail));
+            const creators1 = plan1.repos.flatMap((r) => r.prs.map((p) => p.creatorEmail));
+            const creators2 = plan2.repos.flatMap((r) => r.prs.map((p) => p.creatorEmail));
 
             // At least some creators should be different
             const same = creators1.filter((c, i) => c === creators2[i]).length;
@@ -208,12 +205,12 @@ describe('planner', () => {
             // Generate many PRs to find drafts (10% chance)
             const config = createTestConfig({
                 seed: 42,
-                scale: { ...createTestConfig().scale, prsPerRepo: 20 }
+                scale: { ...createTestConfig().scale, prsPerRepo: 20 },
             });
             const plan = createPlan(config);
 
-            const allPrs = plan.repos.flatMap(r => r.prs);
-            const drafts = allPrs.filter(p => p.isDraft);
+            const allPrs = plan.repos.flatMap((r) => r.prs);
+            const drafts = allPrs.filter((p) => p.isDraft);
 
             // Should have some drafts (10% of 60 PRs = ~6)
             expect(drafts.length).toBeGreaterThan(0);
@@ -224,7 +221,7 @@ describe('planner', () => {
             }
 
             // Non-drafts should have shouldPublishDraft = false
-            const nonDrafts = allPrs.filter(p => !p.isDraft);
+            const nonDrafts = allPrs.filter((p) => !p.isDraft);
             for (const pr of nonDrafts) {
                 expect(pr.shouldPublishDraft).toBe(false);
             }

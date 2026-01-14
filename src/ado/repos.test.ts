@@ -1,6 +1,6 @@
 /**
  * Tests for RepoManager with sanitized error handling.
- * 
+ *
  * IMPORTANT: This test exists because of a bug where repos.ts was checking
  * error.response?.status but client.ts sanitizes errors and puts the status
  * directly on error.status. This mismatch caused 404 "repo not found" errors
@@ -53,8 +53,9 @@ describe('RepoManager error handling', () => {
 
             const repoManager = new RepoManager(mockClient as any);
 
-            await expect(repoManager.getRepo('my-project', 'some-repo'))
-                .rejects.toThrow('Request failed with status code 403');
+            await expect(repoManager.getRepo('my-project', 'some-repo')).rejects.toThrow(
+                'Request failed with status code 403'
+            );
         });
 
         it('throws for errors without status (network errors)', async () => {
@@ -66,8 +67,7 @@ describe('RepoManager error handling', () => {
 
             const repoManager = new RepoManager(mockClient as any);
 
-            await expect(repoManager.getRepo('my-project', 'some-repo'))
-                .rejects.toThrow('Network Error');
+            await expect(repoManager.getRepo('my-project', 'some-repo')).rejects.toThrow('Network Error');
         });
     });
 
@@ -79,7 +79,11 @@ describe('RepoManager error handling', () => {
             };
 
             const repoManager = new RepoManager(mockClient as any);
-            const result = await repoManager.ensureRepo('my-project', 'my-repo', { createIfMissing: true, failIfMissing: false, skipIfExists: false });
+            const result = await repoManager.ensureRepo('my-project', 'my-repo', {
+                createIfMissing: true,
+                failIfMissing: false,
+                skipIfExists: false,
+            });
 
             expect(result).not.toBeNull();
             expect(result?.repo.id).toBe('existing-id');
@@ -97,7 +101,11 @@ describe('RepoManager error handling', () => {
             };
 
             const repoManager = new RepoManager(mockClient as any);
-            const result = await repoManager.ensureRepo('my-project', 'new-repo', { createIfMissing: true, failIfMissing: false, skipIfExists: false });
+            const result = await repoManager.ensureRepo('my-project', 'new-repo', {
+                createIfMissing: true,
+                failIfMissing: false,
+                skipIfExists: false,
+            });
 
             expect(result).not.toBeNull();
             expect(result?.repo.id).toBe('new-id');
@@ -111,7 +119,11 @@ describe('RepoManager error handling', () => {
             };
 
             const repoManager = new RepoManager(mockClient as any);
-            const result = await repoManager.ensureRepo('my-project', 'my-repo', { createIfMissing: false, failIfMissing: false, skipIfExists: true });
+            const result = await repoManager.ensureRepo('my-project', 'my-repo', {
+                createIfMissing: false,
+                failIfMissing: false,
+                skipIfExists: true,
+            });
 
             expect(result).toBeNull();
         });

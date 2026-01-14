@@ -43,7 +43,7 @@ export class SeedRunner {
         this.version = version;
         this.config = config;
         this.plan = plan;
-        this.allPats = config.resolvedUsers.map(u => u.pat);
+        this.allPats = config.resolvedUsers.map((u) => u.pat);
         this.cleanupOptions = cleanupOptions;
 
         // Primary client uses first user's PAT
@@ -63,12 +63,7 @@ export class SeedRunner {
         this.identityResolver = new IdentityResolver(this.identityClient, config.org);
         this.repoManager = new RepoManager(this.adoClient);
         this.prManager = new PrManager(this.adoClient);
-        this.gitGenerator = new GitGenerator(
-            new SeededRng(config.seed),
-            fixturesPath,
-            this.allPats,
-            targetDate
-        );
+        this.gitGenerator = new GitGenerator(new SeededRng(config.seed), fixturesPath, this.allPats, targetDate);
 
         // Create per-user clients
         for (const user of config.resolvedUsers) {
@@ -78,7 +73,6 @@ export class SeedRunner {
             );
         }
     }
-
 
     /**
      * Runs the complete seeding process.
@@ -109,7 +103,9 @@ export class SeedRunner {
                 console.log(`📊 Open PR count across repos: ${openPrCount}`);
 
                 if (openPrCount > this.cleanupOptions.cleanupThreshold) {
-                    console.log(`🧹 Cleanup mode triggered (${openPrCount} > ${this.cleanupOptions.cleanupThreshold} threshold)\n`);
+                    console.log(
+                        `🧹 Cleanup mode triggered (${openPrCount} > ${this.cleanupOptions.cleanupThreshold} threshold)\n`
+                    );
                     summary.cleanupMode = true;
                     const cleanupStats = await this.runCleanupMode(openPrCount - this.cleanupOptions.cleanupThreshold);
                     summary.cleanupStats = cleanupStats;
@@ -240,10 +236,11 @@ export class SeedRunner {
             }
         }
 
-        console.log(`\n   📊 Cleanup summary: ${stats.prsCompleted} completed, ${stats.draftsPublished} drafts published, ${stats.prsFailed} failed`);
+        console.log(
+            `\n   📊 Cleanup summary: ${stats.prsCompleted} completed, ${stats.draftsPublished} drafts published, ${stats.prsFailed} failed`
+        );
         return stats;
     }
-
 
     private async resolveAllIdentities(): Promise<void> {
         for (const user of this.config.resolvedUsers) {
@@ -259,15 +256,19 @@ export class SeedRunner {
     }
 
     private async preflightPolicies(): Promise<void> {
-        const projects = [...new Set(this.plan.repos.map(r => r.project))];
+        const projects = [...new Set(this.plan.repos.map((r) => r.project))];
         console.log('🔍 Preflight: Checking for branch policies...');
 
         for (const project of projects) {
             try {
                 const policies = await this.prManager.getPolicyConfigurations(project);
-                const dangerousPolicies = policies.filter(p =>
-                    p.isEnabled && !p.isDeleted &&
-                    ['Minimum reviewer count', 'Required reviewers', 'Check for merge conflicts'].includes(p.type.displayName)
+                const dangerousPolicies = policies.filter(
+                    (p) =>
+                        p.isEnabled &&
+                        !p.isDeleted &&
+                        ['Minimum reviewer count', 'Required reviewers', 'Check for merge conflicts'].includes(
+                            p.type.displayName
+                        )
                 );
 
                 if (dangerousPolicies.length > 0) {
@@ -278,7 +279,9 @@ export class SeedRunner {
                     console.warn(`   These may block automated PR completion if criteria aren't met.\n`);
                 }
             } catch (error) {
-                console.warn(`⚠️  Failed to query policies for project '${project}': ${error instanceof Error ? error.message : String(error)}`);
+                console.warn(
+                    `⚠️  Failed to query policies for project '${project}': ${error instanceof Error ? error.message : String(error)}`
+                );
             }
         }
     }
@@ -296,7 +299,11 @@ export class SeedRunner {
 
         try {
             // Create/ensure repo exists
-            const repoResult = await this.repoManager.ensureRepo(planned.project, planned.repoName, this.config.repoStrategy);
+            const repoResult = await this.repoManager.ensureRepo(
+                planned.project,
+                planned.repoName,
+                this.config.repoStrategy
+            );
             if (!repoResult) {
                 // Skipped or recorded warning elsewhere (though RepoResult needs to show it)
                 return result;
@@ -305,7 +312,7 @@ export class SeedRunner {
             result.repoId = repo.id;
 
             // Generate and push git content (FATAL on failure)
-            const branchSpecs: BranchSpec[] = planned.branches.map(b => ({
+            const branchSpecs: BranchSpec[] = planned.branches.map((b) => ({
                 name: b.name,
                 commits: b.commits,
             }));
@@ -336,7 +343,9 @@ export class SeedRunner {
                 );
 
                 if (collisions.length > 0) {
-                    throw new Error(`FATAL: Collision detected on branches: ${collisions.join(', ')}. This runId has already been used for this repository.`);
+                    throw new Error(
+                        `FATAL: Collision detected on branches: ${collisions.join(', ')}. This runId has already been used for this repository.`
+                    );
                 }
 
                 // Skip pushing main for existing repos (accumulation mode)
@@ -437,7 +446,7 @@ export class SeedRunner {
             if (!effectivelyDraft) {
                 for (const reviewer of planned.reviewers) {
                     try {
-                        const user = this.config.resolvedUsers.find(u => u.email === reviewer.email);
+                        const user = this.config.resolvedUsers.find((u) => u.email === reviewer.email);
                         if (user?.identityId) {
                             await this.prManager.addReviewer({
                                 project,
@@ -526,7 +535,7 @@ export class SeedRunner {
                             // Retry on 409 (Conflict) - usually means PR is being updated/merged
                             if (error.status === 409 && retries < maxPrRetries) {
                                 retries++;
-                                await new Promise(r => setTimeout(r, 2000));
+                                await new Promise((r) => setTimeout(r, 2000));
                                 continue;
                             }
                             throw error;

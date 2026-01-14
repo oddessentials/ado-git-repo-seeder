@@ -4,7 +4,17 @@ import { SeededRng } from '../util/rng.js';
 
 // Safe text file extensions for derivation
 const SAFE_EXTENSIONS = new Set([
-    '.ts', '.js', '.tsx', '.jsx', '.json', '.md', '.txt', '.css', '.html', '.yml', '.yaml',
+    '.ts',
+    '.js',
+    '.tsx',
+    '.jsx',
+    '.json',
+    '.md',
+    '.txt',
+    '.css',
+    '.html',
+    '.yml',
+    '.yaml',
 ]);
 
 interface FileContent {
@@ -93,11 +103,7 @@ export class ContentDeriver {
 
         // Mutate string literals (safe)
         result = result.replace(/"[^"]{1,20}"/g, () => {
-            const strings = [
-                `"value-${index}"`,
-                `"data-${rng.int(100, 999)}"`,
-                `"item-${Date.now() % 10000}"`,
-            ];
+            const strings = [`"value-${index}"`, `"data-${rng.int(100, 999)}"`, `"item-${Date.now() % 10000}"`];
             return rng.pick(strings);
         });
 

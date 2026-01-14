@@ -160,7 +160,7 @@ async function main(): Promise<void> {
             const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
             version = pkg.version;
         }
-    } catch { }
+    } catch {}
 
     console.log(`🌱 ADO Git Repo Seeder (v${version})\n`);
 
@@ -187,7 +187,7 @@ async function main(): Promise<void> {
         console.log(`🧹 Purging stale working directory: ${rootTemp}`);
         try {
             rmSync(rootTemp, { recursive: true, force: true });
-        } catch { }
+        } catch {}
     }
 
     console.log(`   Organization: ${config.org}`);
@@ -216,12 +216,14 @@ async function main(): Promise<void> {
 
         for (const repo of plan.repos) {
             console.log(`📁 ${repo.project}/${repo.repoName} [Strategy: ${repo.resolvedNaming}]`);
-            console.log(`   Branches: ${repo.branches.map(b => b.name).join(', ')}`);
+            console.log(`   Branches: ${repo.branches.map((b) => b.name).join(', ')}`);
             console.log(`   PRs:`);
             for (const pr of repo.prs) {
                 console.log(`     - "${pr.title}" by ${pr.creatorEmail}`);
-                console.log(`       Reviewers: ${pr.reviewers.map(r => `${r.email}(${r.vote})`).join(', ')}`);
-                console.log(`       Comments: ${pr.comments.length}, Outcome: ${pr.outcome}, Follow-up: ${pr.followUpCommits}`);
+                console.log(`       Reviewers: ${pr.reviewers.map((r) => `${r.email}(${r.vote})`).join(', ')}`);
+                console.log(
+                    `       Comments: ${pr.comments.length}, Outcome: ${pr.outcome}, Follow-up: ${pr.followUpCommits}`
+                );
             }
             console.log('');
         }

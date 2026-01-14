@@ -23,7 +23,7 @@ export async function exec(
 
     return new Promise((resolve, reject) => {
         // Quote arguments with spaces for shell execution (especially important on Windows)
-        const escapedArgs = args.map(arg => {
+        const escapedArgs = args.map((arg) => {
             if (arg === '' || arg.includes(' ') || arg.includes('\t') || arg.includes('\n')) {
                 return `"${arg.replaceAll('"', '\\"')}"`;
             }

@@ -134,11 +134,14 @@ export class PrManager {
     /**
      * Gets a pull request by ID.
      */
-    async getPrDetails(project: string, repoId: string, prId: number): Promise<PullRequest & { lastMergeSourceCommit: { commitId: string } }> {
-        const response = await this.client.get(
-            `/${project}/_apis/git/repositories/${repoId}/pullrequests/${prId}`,
-            { params: { 'api-version': '7.1' } }
-        );
+    async getPrDetails(
+        project: string,
+        repoId: string,
+        prId: number
+    ): Promise<PullRequest & { lastMergeSourceCommit: { commitId: string } }> {
+        const response = await this.client.get(`/${project}/_apis/git/repositories/${repoId}/pullrequests/${prId}`, {
+            params: { 'api-version': '7.1' },
+        });
         return response.data;
     }
 
@@ -179,15 +182,12 @@ export class PrManager {
      * Returns PRs sorted by creation date (oldest first).
      */
     async listOpenPrs(project: string, repoId: string): Promise<PullRequest[]> {
-        const response = await this.client.get(
-            `/${project}/_apis/git/repositories/${repoId}/pullrequests`,
-            {
-                params: {
-                    'api-version': '7.1',
-                    'searchCriteria.status': 'active',
-                },
-            }
-        );
+        const response = await this.client.get(`/${project}/_apis/git/repositories/${repoId}/pullrequests`, {
+            params: {
+                'api-version': '7.1',
+                'searchCriteria.status': 'active',
+            },
+        });
         return response.data?.value ?? [];
     }
 }
