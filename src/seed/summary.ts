@@ -101,7 +101,7 @@ export function generateMarkdownSummary(summary: SeedSummary): string {
             for (const pr of repo.prs) {
                 lines.push(`- **#${pr.prId}** ${pr.title}`);
                 lines.push(`  - Creator: ${pr.creator}`);
-                lines.push(`  - Reviewers: ${pr.reviewers.map(r => `${r.email} (${r.vote})`).join(', ') || 'none'}`);
+                lines.push(`  - Reviewers: ${pr.reviewers.map((r) => `${r.email} (${r.vote})`).join(', ') || 'none'}`);
                 lines.push(`  - Comments: ${pr.comments}`);
                 if (pr.followUpCommitsAdded > 0) {
                     lines.push(`  - Follow-up Commits: ${pr.followUpCommitsAdded}`);

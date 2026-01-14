@@ -102,11 +102,7 @@ export interface LoadedConfig extends SeedConfig {
 /**
  * Resolves properties for a specific repository using hierarchy: Repo > Project > Global.
  */
-export function resolveRepoConfig(
-    config: SeedConfig,
-    project: Project,
-    repo: RepoConfig
-) {
+export function resolveRepoConfig(config: SeedConfig, project: Project, repo: RepoConfig) {
     const repoObj = typeof repo === 'string' ? { name: repo } : repo;
     return {
         name: repoObj.name,
@@ -138,9 +134,7 @@ export function loadConfig(configPath: string, runIdOverride?: string): LoadedCo
     const resolvedUsers: ResolvedUser[] = config.users.map((user) => {
         const pat = process.env[user.patEnvVar];
         if (!pat) {
-            throw new Error(
-                `Missing environment variable '${user.patEnvVar}' for user '${user.email}'`
-            );
+            throw new Error(`Missing environment variable '${user.patEnvVar}' for user '${user.email}'`);
         }
         return { ...user, pat };
     });

@@ -49,7 +49,9 @@ export class GitGenerator {
         const tempDir = join(rootTemp, repoName);
 
         // Ensure directory exists (cleanup logic should handle stale ones)
-        try { rmSync(tempDir, { recursive: true, force: true }); } catch { }
+        try {
+            rmSync(tempDir, { recursive: true, force: true });
+        } catch {}
         const actualTempDir = mkdtempSync(join(rootTemp, `${repoName}-`));
 
         const createdBranches: string[] = [];
@@ -86,7 +88,7 @@ export class GitGenerator {
                         try {
                             const nodeFs = await import('node:fs');
                             nodeFs.mkdirSync(fileDir, { recursive: true });
-                        } catch { }
+                        } catch {}
                         writeFileSync(filePath, file.content);
                     }
                     await this.git(actualTempDir, ['add', '.']);
@@ -221,10 +223,10 @@ export class GitGenerator {
             const result = await this.git(tmpdir(), ['ls-remote', '--heads', cleanUrl], true, env);
             const remoteHeads = result.stdout
                 .split('\n')
-                .filter(line => line.trim())
-                .map(line => line.split(/\s+/)[1].replace('refs/heads/', ''));
+                .filter((line) => line.trim())
+                .map((line) => line.split(/\s+/)[1].replace('refs/heads/', ''));
 
-            const collisions = branches.filter(b => remoteHeads.includes(b));
+            const collisions = branches.filter((b) => remoteHeads.includes(b));
             return collisions;
         } finally {
             askPass.cleanup();
@@ -236,11 +238,9 @@ export class GitGenerator {
         const scriptExt = isWindows ? '.bat' : '.sh';
         const scriptPath = join(tmpdir(), `askpass-${Math.random().toString(36).slice(2)}${scriptExt}`);
 
-        // Windows Git expects a script that echoes the PAT. 
+        // Windows Git expects a script that echoes the PAT.
         // Note: Git on Windows often needs certain escaping or specific format for ASKPASS
-        const content = isWindows
-            ? `@echo ${pat}`
-            : `#!/bin/sh\necho "${pat}"`;
+        const content = isWindows ? `@echo ${pat}` : `#!/bin/sh\necho "${pat}"`;
 
         writeFileSync(scriptPath, content);
         if (!isWindows) {
@@ -250,8 +250,10 @@ export class GitGenerator {
         return {
             path: scriptPath,
             cleanup: () => {
-                try { rmSync(scriptPath, { force: true }); } catch { }
-            }
+                try {
+                    rmSync(scriptPath, { force: true });
+                } catch {}
+            },
         };
     }
 
@@ -262,9 +264,10 @@ export class GitGenerator {
         env?: NodeJS.ProcessEnv
     ): Promise<{ stdout: string; stderr: string }> {
         // Inject commit date if set (for backdating)
-        const dateEnv = this.targetDate && args.includes('commit')
-            ? { GIT_AUTHOR_DATE: this.targetDate, GIT_COMMITTER_DATE: this.targetDate }
-            : {};
+        const dateEnv =
+            this.targetDate && args.includes('commit')
+                ? { GIT_AUTHOR_DATE: this.targetDate, GIT_COMMITTER_DATE: this.targetDate }
+                : {};
 
         const result = await exec('git', args, {
             cwd,

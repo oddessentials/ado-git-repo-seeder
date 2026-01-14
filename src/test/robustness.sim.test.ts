@@ -49,10 +49,16 @@ describe('Multi-Run Robustness (Simulated)', () => {
             get: vi.fn().mockImplementation((url) => {
                 const lowUrl = url.toLowerCase();
                 if (lowUrl.includes('_apis/policy/configurations')) return Promise.resolve({ data: { value: [] } });
-                if (lowUrl.includes('_apis/git/repositories/repo1')) return Promise.resolve({ data: { id: 'repo-id-1', remoteUrl: 'https://fake/Repo1' } });
-                if (lowUrl.includes('_apis/git/repositories')) return Promise.resolve({ data: { value: [{ name: 'Repo1', id: 'repo-id-1' }] } });
-                if (lowUrl.includes('_apis/identities')) return Promise.resolve({ data: { value: [{ id: 'user-id-1' }] } });
-                if (lowUrl.includes('pullrequests/')) return Promise.resolve({ data: { pullRequestId: 101, lastMergeSourceCommit: { commitId: 'abc' } } });
+                if (lowUrl.includes('_apis/git/repositories/repo1'))
+                    return Promise.resolve({ data: { id: 'repo-id-1', remoteUrl: 'https://fake/Repo1' } });
+                if (lowUrl.includes('_apis/git/repositories'))
+                    return Promise.resolve({ data: { value: [{ name: 'Repo1', id: 'repo-id-1' }] } });
+                if (lowUrl.includes('_apis/identities'))
+                    return Promise.resolve({ data: { value: [{ id: 'user-id-1' }] } });
+                if (lowUrl.includes('pullrequests/'))
+                    return Promise.resolve({
+                        data: { pullRequestId: 101, lastMergeSourceCommit: { commitId: 'abc' } },
+                    });
                 return Promise.resolve({ data: {} });
             }),
             post: vi.fn().mockResolvedValue({ data: { pullRequestId: 101 } }),
@@ -80,7 +86,11 @@ describe('Multi-Run Robustness (Simulated)', () => {
         expect(summary2.fatalFailure).toBeNull();
 
         // Verify checkCollisions was called with seeder@ URL
-        expect(exec).toHaveBeenCalledWith('git', expect.arrayContaining(['ls-remote', '--heads', 'https://seeder@fake/Repo1']), expect.any(Object));
+        expect(exec).toHaveBeenCalledWith(
+            'git',
+            expect.arrayContaining(['ls-remote', '--heads', 'https://seeder@fake/Repo1']),
+            expect.any(Object)
+        );
     });
 
     it('Scenario 2: Fatal Collision (Run 2 re-run with same runId)', async () => {
@@ -91,7 +101,7 @@ describe('Multi-Run Robustness (Simulated)', () => {
                 return Promise.resolve({
                     stdout: 'hash\trefs/heads/chore/run-day-2-0',
                     stderr: '',
-                    code: 0
+                    code: 0,
                 });
             }
             return Promise.resolve({ stdout: '', stderr: '', code: 0 });

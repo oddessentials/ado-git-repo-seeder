@@ -29,9 +29,26 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Run tests
-        run: npm test
+      - name: Check formatting
+        run: npm run format:check
 
       - name: Lint
         run: npm run lint
-        continue-on-error: true  # Don't fail on lint warnings initially
+
+      - name: Run tests with coverage
+        run: npx vitest run --coverage --coverage.thresholds.statements=70 --coverage.thresholds.branches=50 --coverage.thresholds.functions=70 --coverage.thresholds.lines=70
+
+      - name: Security audit
+        run: npm audit --audit-level=high
+        continue-on-error: true  # Don't fail on audit initially, just warn
+
+      - name: Update badges
+        if: github.ref == 'refs/heads/main' && matrix.node-version == '22.x'
+        run: npm run sync-badges
+
+      - name: Commit badge updates
+        if: github.ref == 'refs/heads/main' && matrix.node-version == '22.x'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update badges [skip ci]"
+          file_pattern: README.md

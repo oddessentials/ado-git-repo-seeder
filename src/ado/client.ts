@@ -43,7 +43,7 @@ export function createAdoClient(options: AdoClientOptions): AxiosInstance {
                 throw sanitizeError(error, allPats);
             }
 
-            const retryCount = ((config as { _retryCount?: number })._retryCount ?? 0);
+            const retryCount = (config as { _retryCount?: number })._retryCount ?? 0;
             const status = error.response?.status;
 
             // Retry on 429 (rate limit) or 5xx (server errors)
@@ -84,7 +84,7 @@ export function createIdentityClient(options: AdoClientOptions): AxiosInstance {
                 throw sanitizeError(error, allPats);
             }
 
-            const retryCount = ((config as { _retryCount?: number })._retryCount ?? 0);
+            const retryCount = (config as { _retryCount?: number })._retryCount ?? 0;
             const status = error.response?.status;
 
             if ((status === 429 || (status && status >= 500)) && retryCount < MAX_RETRIES) {

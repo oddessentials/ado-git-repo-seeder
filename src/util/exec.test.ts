@@ -1,6 +1,6 @@
 /**
  * Tests for exec utility with Windows environment variable preservation.
- * 
+ *
  * IMPORTANT: This test exists because of a bug where Windows-critical env vars
  * (ComSpec, SYSTEMROOT) were being shadowed during child process spawning,
  * causing "spawn cmd.exe ENOENT" errors on Windows.

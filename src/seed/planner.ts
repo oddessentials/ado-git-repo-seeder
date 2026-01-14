@@ -72,9 +72,8 @@ export function createPlan(config: LoadedConfig): SeedPlan {
             const resolved = resolveRepoConfig(config, project, repoConfig);
 
             // Apply naming strategy
-            const effectiveRepoName = resolved.repoNaming === 'isolated'
-                ? `${resolved.name}-${config.runId}`
-                : resolved.name;
+            const effectiveRepoName =
+                resolved.repoNaming === 'isolated' ? `${resolved.name}-${config.runId}` : resolved.name;
 
             // Plan branches
             const branches: PlannedBranch[] = [];
@@ -96,14 +95,14 @@ export function createPlan(config: LoadedConfig): SeedPlan {
                 const creator = rng.pick(config.resolvedUsers);
 
                 // Select reviewers (exclude creator)
-                const potentialReviewers = config.resolvedUsers.filter(u => u.email !== creator.email);
+                const potentialReviewers = config.resolvedUsers.filter((u) => u.email !== creator.email);
                 const reviewerCount = Math.min(
                     rng.int(config.scale.reviewersPerPr.min, config.scale.reviewersPerPr.max),
                     potentialReviewers.length
                 );
                 const reviewerUsers = rng.pickN(potentialReviewers, reviewerCount);
 
-                const reviewers: PlannedReviewer[] = reviewerUsers.map(u => ({
+                const reviewers: PlannedReviewer[] = reviewerUsers.map((u) => ({
                     email: u.email,
                     vote: rng.weighted(config.voteDistribution) as VoteType,
                 }));
@@ -165,9 +164,13 @@ export function createPlan(config: LoadedConfig): SeedPlan {
  */
 export function voteToValue(vote: VoteType): VoteValue {
     switch (vote) {
-        case 'approve': return 10;
-        case 'approveWithSuggestions': return 5;
-        case 'reject': return -10;
-        case 'noVote': return 0;
+        case 'approve':
+            return 10;
+        case 'approveWithSuggestions':
+            return 5;
+        case 'reject':
+            return -10;
+        case 'noVote':
+            return 0;
     }
 }
