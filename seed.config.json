@@ -5,16 +5,19 @@
         {
             "name": "marketing",
             "repos": [
-                "marketing-site",
-                "marketing-content"
+                "marketing-content",
+                "marketing-site"
             ]
         },
         {
             "name": "engineering",
             "repos": [
                 "core-api",
+                "infra",
                 "web-app",
-                "infra"
+                "backdate-demo-jan-5",
+                "backdate-demo-jan-7",
+                "backdate-demo-jan-8"
             ]
         },
         {
@@ -62,9 +65,9 @@
         "noVote": 0.2
     },
     "prOutcomes": {
-        "complete": 0.6,
-        "abandon": 0.2,
-        "leaveOpen": 0.2
+        "complete": 0.75,
+        "abandon": 0.05,
+        "leaveOpen": 0.20
     },
     "seed": 12345,
     "repoNaming": "direct"

@@ -2,17 +2,22 @@ import { LoadedConfig, ResolvedUser } from '../config.js';
 import { createAdoClient, createIdentityClient } from '../ado/client.js';
 import { IdentityResolver } from '../ado/identities.js';
 import { RepoManager } from '../ado/repos.js';
-import { PrManager } from '../ado/prs.js';
+import { PrManager, PullRequest } from '../ado/prs.js';
 import { GitGenerator, BranchSpec } from '../git/generator.js';
 import { SeedPlan, PlannedRepo, PlannedPr, voteToValue } from './planner.js';
 import { SeedSummary, RepoResult, PrResult, FailureRecord } from './summary.js';
 import { SeededRng } from '../util/rng.js';
 
+export interface CleanupOptions {
+    cleanupEnabled: boolean;
+    cleanupThreshold: number;
+}
+
 /**
  * Executes the seeding plan against Azure DevOps.
  */
 export class SeedRunner {
-    private version: string; // NEW
+    private version: string;
     private config: LoadedConfig;
     private plan: SeedPlan;
     private adoClient: ReturnType<typeof createAdoClient>;
@@ -22,15 +27,24 @@ export class SeedRunner {
     private prManager: PrManager;
     private gitGenerator: GitGenerator;
     private allPats: string[];
+    private cleanupOptions: CleanupOptions;
 
     // Per-user clients for operations that need different auth
     private userClients: Map<string, ReturnType<typeof createAdoClient>> = new Map();
 
-    constructor(config: LoadedConfig, plan: SeedPlan, fixturesPath?: string, version: string = 'unknown', targetDate?: string) {
+    constructor(
+        config: LoadedConfig,
+        plan: SeedPlan,
+        fixturesPath?: string,
+        version: string = 'unknown',
+        targetDate?: string,
+        cleanupOptions: CleanupOptions = { cleanupEnabled: true, cleanupThreshold: 50 }
+    ) {
         this.version = version;
         this.config = config;
         this.plan = plan;
         this.allPats = config.resolvedUsers.map(u => u.pat);
+        this.cleanupOptions = cleanupOptions;
 
         // Primary client uses first user's PAT
         const primaryUser = config.resolvedUsers[0];
@@ -71,13 +85,15 @@ export class SeedRunner {
      */
     async run(): Promise<SeedSummary> {
         const summary: SeedSummary = {
-            version: this.version, // NEW
+            version: this.version,
             runId: this.config.runId,
             org: this.config.org,
             startTime: new Date().toISOString(),
             endTime: '',
             repos: [],
             fatalFailure: null,
+            cleanupMode: false,
+            cleanupStats: undefined,
         };
 
         try {
@@ -87,7 +103,24 @@ export class SeedRunner {
             // Step 2: Resolve all identities (FATAL on failure)
             await this.resolveAllIdentities();
 
-            // Step 3: Process each repo
+            // Step 3: Check if cleanup mode should be triggered
+            if (this.cleanupOptions.cleanupEnabled) {
+                const openPrCount = await this.countOpenPrs();
+                console.log(`📊 Open PR count across repos: ${openPrCount}`);
+
+                if (openPrCount > this.cleanupOptions.cleanupThreshold) {
+                    console.log(`🧹 Cleanup mode triggered (${openPrCount} > ${this.cleanupOptions.cleanupThreshold} threshold)\n`);
+                    summary.cleanupMode = true;
+                    const cleanupStats = await this.runCleanupMode(openPrCount - this.cleanupOptions.cleanupThreshold);
+                    summary.cleanupStats = cleanupStats;
+                    summary.endTime = new Date().toISOString();
+                    return summary;
+                } else {
+                    console.log(`✅ Below threshold, proceeding with normal seeding\n`);
+                }
+            }
+
+            // Step 4: Process each repo (normal seeding mode)
             for (const plannedRepo of this.plan.repos) {
                 const repoResult = await this.processRepo(plannedRepo);
                 summary.repos.push(repoResult);
@@ -102,6 +135,115 @@ export class SeedRunner {
         summary.endTime = new Date().toISOString();
         return summary;
     }
+
+    /**
+     * Counts total open PRs across all configured repos.
+     */
+    private async countOpenPrs(): Promise<number> {
+        let total = 0;
+        for (const project of this.config.projects) {
+            for (const repoConfig of project.repos) {
+                const repoName = typeof repoConfig === 'string' ? repoConfig : repoConfig.name;
+                try {
+                    const repo = await this.repoManager.getRepo(project.name, repoName);
+                    if (repo) {
+                        const openPrs = await this.prManager.listOpenPrs(project.name, repo.id);
+                        total += openPrs.length;
+                    }
+                } catch {
+                    // Repo might not exist yet, skip
+                }
+            }
+        }
+        return total;
+    }
+
+    /**
+     * Runs cleanup mode: publishes drafts and completes/abandons oldest open PRs.
+     */
+    private async runCleanupMode(targetCount: number): Promise<{
+        draftsPublished: number;
+        prsCompleted: number;
+        prsFailed: number;
+    }> {
+        const stats = { draftsPublished: 0, prsCompleted: 0, prsFailed: 0 };
+
+        // Collect all open PRs with project/repo context
+        interface OpenPrInfo {
+            project: string;
+            repoId: string;
+            repoName: string;
+            pr: PullRequest;
+            createdDate: Date;
+        }
+
+        const allOpenPrs: OpenPrInfo[] = [];
+
+        for (const project of this.config.projects) {
+            for (const repoConfig of project.repos) {
+                const repoName = typeof repoConfig === 'string' ? repoConfig : repoConfig.name;
+                try {
+                    const repo = await this.repoManager.getRepo(project.name, repoName);
+                    if (repo) {
+                        const openPrs = await this.prManager.listOpenPrs(project.name, repo.id);
+                        for (const pr of openPrs) {
+                            allOpenPrs.push({
+                                project: project.name,
+                                repoId: repo.id,
+                                repoName,
+                                pr,
+                                createdDate: new Date((pr as any).creationDate || 0),
+                            });
+                        }
+                    }
+                } catch {
+                    // Skip repos that don't exist
+                }
+            }
+        }
+
+        // Sort by creation date (oldest first)
+        allOpenPrs.sort((a, b) => a.createdDate.getTime() - b.createdDate.getTime());
+
+        console.log(`   Found ${allOpenPrs.length} open PRs, targeting ${targetCount} for completion\n`);
+
+        // Process oldest PRs first
+        for (let i = 0; i < Math.min(targetCount, allOpenPrs.length); i++) {
+            const { project, repoId, repoName, pr } = allOpenPrs[i];
+            const prTitle = pr.title.length > 50 ? pr.title.slice(0, 47) + '...' : pr.title;
+
+            try {
+                // Check if it's a draft and publish it
+                if ((pr as any).isDraft) {
+                    console.log(`   📝 Publishing draft PR #${pr.pullRequestId}: ${prTitle}`);
+                    await this.prManager.publishDraft(project, repoId, pr.pullRequestId);
+                    stats.draftsPublished++;
+                    // Note: After publishing, we'll complete it on the next cleanup run
+                    continue;
+                }
+
+                // Get PR details for completion
+                const prDetails = await this.prManager.getPrDetails(project, repoId, pr.pullRequestId);
+
+                console.log(`   ✅ Completing PR #${pr.pullRequestId}: ${prTitle}`);
+                await this.prManager.completePr(
+                    project,
+                    repoId,
+                    pr.pullRequestId,
+                    prDetails.lastMergeSourceCommit.commitId
+                );
+                stats.prsCompleted++;
+            } catch (error) {
+                const errorMsg = error instanceof Error ? error.message : String(error);
+                console.log(`   ❌ Failed PR #${pr.pullRequestId}: ${errorMsg}`);
+                stats.prsFailed++;
+            }
+        }
+
+        console.log(`\n   📊 Cleanup summary: ${stats.prsCompleted} completed, ${stats.draftsPublished} drafts published, ${stats.prsFailed} failed`);
+        return stats;
+    }
+
 
     private async resolveAllIdentities(): Promise<void> {
         for (const user of this.config.resolvedUsers) {

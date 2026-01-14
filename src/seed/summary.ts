@@ -30,13 +30,19 @@ export interface RepoResult {
 }
 
 export interface SeedSummary {
-    version: string; // NEW
+    version: string;
     runId: string;
     org: string;
     startTime: string;
     endTime: string;
     repos: RepoResult[];
     fatalFailure: { phase: string; error: string } | null;
+    cleanupMode?: boolean;
+    cleanupStats?: {
+        draftsPublished: number;
+        prsCompleted: number;
+        prsFailed: number;
+    };
 }
 
 /**
