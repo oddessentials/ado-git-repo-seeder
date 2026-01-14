@@ -18,6 +18,8 @@ interface CliArgs {
     repoNaming?: 'isolated' | 'direct';
     purgeStale: boolean;
     targetDate?: string; // ISO timestamp for git commit backdating
+    noCleanup: boolean; // Disable cleanup mode (default: false, meaning cleanup is ON)
+    cleanupThreshold: number; // Open PR count threshold to trigger cleanup mode
 }
 
 function parseArgs(): CliArgs {
@@ -28,6 +30,8 @@ function parseArgs(): CliArgs {
         clearCache: false,
         outputDir: '.',
         purgeStale: false,
+        noCleanup: false,
+        cleanupThreshold: 50,
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -64,6 +68,18 @@ function parseArgs(): CliArgs {
             case '--purge-stale':
                 result.purgeStale = true;
                 break;
+            case '--no-cleanup':
+                result.noCleanup = true;
+                break;
+            case '--cleanup-threshold': {
+                const threshold = parseInt(args[++i], 10);
+                if (isNaN(threshold) || threshold < 0) {
+                    console.error('❌ Invalid --cleanup-threshold. Expected a positive integer.');
+                    process.exit(1);
+                }
+                result.cleanupThreshold = threshold;
+                break;
+            }
             case '--date': {
                 const dateStr = args[++i];
                 if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
@@ -105,7 +121,13 @@ Options:
   --naming <mode>         Override global repoNaming strategy (isolated | direct)
   --purge-stale           Purge the temporary working directory on startup
   --date <YYYY-MM-DD>     Backdate git commits to this date (noon UTC)
+  --no-cleanup            Disable cleanup mode (default: cleanup is ON)
+  --cleanup-threshold <n> Open PR count threshold to trigger cleanup (default: 50)
   -h, --help              Show this help message
+
+Cleanup Mode (default: ON):
+  When open PR count exceeds the threshold, the tool prioritizes completing
+  existing PRs over creating new ones. Drafts are published first.
 
 Note: --date only affects git commit timestamps. PRs, comments, and votes
 are server-assigned and will show actual execution time.
@@ -119,6 +141,9 @@ Examples:
 
   # Backdate commits to simulate historical activity
   npx ts-node src/cli.ts --run-id day-1 --date 2026-01-10
+
+  # Disable cleanup mode
+  npx ts-node src/cli.ts --no-cleanup
 `);
 }
 
@@ -224,7 +249,10 @@ async function main(): Promise<void> {
         }
     }
 
-    const runner = new SeedRunner(config, plan, fixturesPath, version, args.targetDate);
+    const runner = new SeedRunner(config, plan, fixturesPath, version, args.targetDate, {
+        cleanupEnabled: !args.noCleanup,
+        cleanupThreshold: args.cleanupThreshold,
+    });
     const summary = await runner.run();
 
     // Output results

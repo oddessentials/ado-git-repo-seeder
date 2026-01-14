@@ -173,4 +173,21 @@ export class PrManager {
         });
         return response.data?.value ?? [];
     }
+
+    /**
+     * Lists open (active) pull requests for a repository.
+     * Returns PRs sorted by creation date (oldest first).
+     */
+    async listOpenPrs(project: string, repoId: string): Promise<PullRequest[]> {
+        const response = await this.client.get(
+            `/${project}/_apis/git/repositories/${repoId}/pullrequests`,
+            {
+                params: {
+                    'api-version': '7.1',
+                    'searchCriteria.status': 'active',
+                },
+            }
+        );
+        return response.data?.value ?? [];
+    }
 }
