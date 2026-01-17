@@ -9,7 +9,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
+    # Required for stefanzweifel/git-auto-commit-action to push badge updates
+    permissions:
+      contents: write
+
     strategy:
       matrix:
         node-version: [20.x, 22.x]
