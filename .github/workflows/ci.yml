@@ -17,6 +17,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Detect CRLF line endings
+        run: |
+          # Fail fast if any script files have CRLF (per @oddessentials/repo-standards)
+          CRLF_FILES=$(git ls-files --eol | grep -E 'w/crlf.*(\.(sh|bash|js|ts|mjs|cjs)$|\.husky/)' || true)
+          if [ -n "$CRLF_FILES" ]; then
+            echo "::error::CRLF line endings detected in script files:"
+            echo "$CRLF_FILES"
+            echo "Run 'git add --renormalize .' to fix."
+            exit 1
+          fi
+
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
