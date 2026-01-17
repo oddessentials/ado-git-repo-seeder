@@ -165,6 +165,29 @@ describe('PrManager', () => {
                     completionOptions: {
                         deleteSourceBranch: false,
                         mergeStrategy: 'squash',
+                        bypassPolicy: false,
+                        bypassReason: undefined,
+                    },
+                },
+                { params: { 'api-version': '7.1' } }
+            );
+        });
+
+        it('completes PR with bypassPolicy when specified', async () => {
+            mockClient.patch.mockResolvedValue({});
+
+            await prManager.completePr('proj', 'repo', 100, 'abc123', { bypassPolicy: true });
+
+            expect(mockClient.patch).toHaveBeenCalledWith(
+                '/proj/_apis/git/repositories/repo/pullrequests/100',
+                {
+                    status: 'completed',
+                    lastMergeSourceCommit: { commitId: 'abc123' },
+                    completionOptions: {
+                        deleteSourceBranch: false,
+                        mergeStrategy: 'squash',
+                        bypassPolicy: true,
+                        bypassReason: 'Automated seeding - conflict auto-resolution',
                     },
                 },
                 { params: { 'api-version': '7.1' } }

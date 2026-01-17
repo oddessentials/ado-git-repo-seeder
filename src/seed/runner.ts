@@ -169,6 +169,7 @@ export class SeedRunner {
             project: string;
             repoId: string;
             repoName: string;
+            remoteUrl: string;
             pr: PullRequest;
             createdDate: Date;
         }
@@ -187,6 +188,7 @@ export class SeedRunner {
                                 project: project.name,
                                 repoId: repo.id,
                                 repoName,
+                                remoteUrl: repo.remoteUrl,
                                 pr,
                                 createdDate: new Date((pr as any).creationDate || 0),
                             });
@@ -204,8 +206,10 @@ export class SeedRunner {
         console.log(`   Found ${allOpenPrs.length} open PRs, targeting ${targetCount} for completion\n`);
 
         // Process oldest PRs first
+        const primaryUser = this.config.resolvedUsers[0];
+
         for (let i = 0; i < Math.min(targetCount, allOpenPrs.length); i++) {
-            const { project, repoId, repoName, pr } = allOpenPrs[i];
+            const { project, repoId, repoName, remoteUrl, pr } = allOpenPrs[i];
             const prTitle = pr.title.length > 50 ? pr.title.slice(0, 47) + '...' : pr.title;
 
             try {
@@ -218,17 +222,28 @@ export class SeedRunner {
                     continue;
                 }
 
-                // Get PR details for completion
-                const prDetails = await this.prManager.getPrDetails(project, repoId, pr.pullRequestId);
+                // Extract source branch from refs/heads/<branch>
+                const sourceBranch = pr.sourceRefName.replace('refs/heads/', '');
+                const targetBranch = pr.targetRefName.replace('refs/heads/', '');
 
                 console.log(`   ✅ Completing PR #${pr.pullRequestId}: ${prTitle}`);
-                await this.prManager.completePr(
+
+                // Use conflict resolution helper for robust completion
+                const completed = await this.completePrWithConflictResolution(
                     project,
                     repoId,
                     pr.pullRequestId,
-                    prDetails.lastMergeSourceCommit.commitId
+                    sourceBranch,
+                    remoteUrl,
+                    primaryUser.pat,
+                    targetBranch
                 );
-                stats.prsCompleted++;
+
+                if (completed) {
+                    stats.prsCompleted++;
+                } else {
+                    stats.prsFailed++;
+                }
             } catch (error) {
                 const errorMsg = error instanceof Error ? error.message : String(error);
                 console.log(`   ❌ Failed PR #${pr.pullRequestId}: ${errorMsg}`);
@@ -514,32 +529,24 @@ export class SeedRunner {
                     // Draft PRs cannot be completed or abandoned - leave them as-is
                     prResult.outcomeApplied = true; // Skip counts as "applied" for drafts
                 } else if (planned.outcome === 'complete') {
-                    // Robust completion with retry for 409
-                    let retries = 0;
-                    const maxPrRetries = 2;
-                    let lastError: any = null;
-
-                    while (retries <= maxPrRetries) {
-                        try {
-                            const prDetails = await this.prManager.getPrDetails(project, repoId, pr.pullRequestId);
-                            await this.prManager.completePr(
-                                project,
-                                repoId,
-                                pr.pullRequestId,
-                                prDetails.lastMergeSourceCommit.commitId
-                            );
-                            prResult.outcomeApplied = true;
-                            break;
-                        } catch (error: any) {
-                            lastError = error;
-                            // Retry on 409 (Conflict) - usually means PR is being updated/merged
-                            if (error.status === 409 && retries < maxPrRetries) {
-                                retries++;
-                                await new Promise((r) => setTimeout(r, 2000));
-                                continue;
-                            }
-                            throw error;
-                        }
+                    // Robust completion with conflict auto-resolution and retry for 409
+                    const primaryUser = this.config.resolvedUsers[0];
+                    const completed = await this.completePrWithConflictResolution(
+                        project,
+                        repoId,
+                        pr.pullRequestId,
+                        planned.sourceBranch,
+                        repo.remoteUrl,
+                        primaryUser.pat
+                    );
+                    prResult.outcomeApplied = completed;
+                    if (!completed) {
+                        failures.push({
+                            phase: 'apply-outcome',
+                            prId: pr.pullRequestId,
+                            error: 'Failed to complete PR after conflict resolution attempts',
+                            isFatal: false,
+                        });
                     }
                 } else if (planned.outcome === 'abandon') {
                     await this.prManager.abandonPr(project, repoId, pr.pullRequestId);
@@ -590,5 +597,87 @@ export class SeedRunner {
             });
             return null;
         }
+    }
+
+    /**
+     * Attempts to complete a PR with automatic conflict resolution.
+     * 1. Checks merge status
+     * 2. If conflicts, resolves them by merging target into source
+     * 3. Retries completion with bypassPolicy enabled
+     *
+     * @returns true if PR was completed successfully
+     */
+    private async completePrWithConflictResolution(
+        project: string,
+        repoId: string,
+        prId: number,
+        sourceBranch: string,
+        remoteUrl: string,
+        pat: string,
+        targetBranch: string = 'main'
+    ): Promise<boolean> {
+        const maxRetries = 3;
+
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                // Get PR details including merge status
+                const prDetails = await this.prManager.getPrDetails(project, repoId, prId);
+
+                // Check if there are merge conflicts
+                if (prDetails.mergeStatus === 'conflicts') {
+                    console.log(`   ⚠️  PR #${prId} has conflicts, auto-resolving...`);
+
+                    // Resolve conflicts
+                    const resolution = await this.gitGenerator.resolveConflicts(
+                        remoteUrl,
+                        pat,
+                        sourceBranch,
+                        targetBranch
+                    );
+
+                    if (!resolution.resolved) {
+                        console.log(`   ❌ Conflict resolution failed for PR #${prId}: ${resolution.error}`);
+                        // Continue to try completion anyway - ADO might accept it
+                    } else {
+                        console.log(`   ✅ Conflicts resolved for PR #${prId}`);
+                    }
+
+                    // Wait for ADO to re-evaluate merge status
+                    await new Promise((r) => setTimeout(r, 3000));
+
+                    // Refresh PR details after resolution
+                    const refreshed = await this.prManager.getPrDetails(project, repoId, prId);
+
+                    // Complete with bypassPolicy to handle any policy blocks
+                    await this.prManager.completePr(project, repoId, prId, refreshed.lastMergeSourceCommit.commitId, {
+                        bypassPolicy: true,
+                    });
+
+                    return true;
+                }
+
+                // No conflicts - complete normally (with bypassPolicy for safety)
+                await this.prManager.completePr(project, repoId, prId, prDetails.lastMergeSourceCommit.commitId, {
+                    bypassPolicy: true,
+                });
+
+                return true;
+            } catch (error: any) {
+                // Retry on 409 (Conflict) - usually means PR is being updated
+                if (error.status === 409 && attempt < maxRetries - 1) {
+                    console.log(`   🔄 PR #${prId} update conflict (409), retrying...`);
+                    await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+                    continue;
+                }
+
+                // Log the error but don't throw - we'll return false
+                console.log(
+                    `   ❌ Failed to complete PR #${prId}: ${error instanceof Error ? error.message : String(error)}`
+                );
+                return false;
+            }
+        }
+
+        return false;
     }
 }
