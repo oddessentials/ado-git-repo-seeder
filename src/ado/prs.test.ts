@@ -165,6 +165,29 @@ describe('PrManager', () => {
                     completionOptions: {
                         deleteSourceBranch: false,
                         mergeStrategy: 'squash',
+                        bypassPolicy: false,
+                        bypassReason: undefined,
+                    },
+                },
+                { params: { 'api-version': '7.1' } }
+            );
+        });
+
+        it('completes PR with bypassPolicy when specified', async () => {
+            mockClient.patch.mockResolvedValue({});
+
+            await prManager.completePr('proj', 'repo', 100, 'abc123', { bypassPolicy: true });
+
+            expect(mockClient.patch).toHaveBeenCalledWith(
+                '/proj/_apis/git/repositories/repo/pullrequests/100',
+                {
+                    status: 'completed',
+                    lastMergeSourceCommit: { commitId: 'abc123' },
+                    completionOptions: {
+                        deleteSourceBranch: false,
+                        mergeStrategy: 'squash',
+                        bypassPolicy: true,
+                        bypassReason: 'Automated seeding - conflict auto-resolution',
                     },
                 },
                 { params: { 'api-version': '7.1' } }
@@ -215,6 +238,34 @@ describe('PrManager', () => {
                 params: { 'api-version': '7.1' },
             });
             expect(result).toEqual(prDetails);
+        });
+
+        it('returns mergeStatus when PR has conflicts', async () => {
+            const prDetails = {
+                pullRequestId: 100,
+                title: 'Conflicting PR',
+                lastMergeSourceCommit: { commitId: 'abc123' },
+                mergeStatus: 'conflicts',
+            };
+            mockClient.get.mockResolvedValue({ data: prDetails });
+
+            const result = await prManager.getPrDetails('proj', 'repo', 100);
+
+            expect(result.mergeStatus).toBe('conflicts');
+        });
+
+        it('returns mergeStatus when PR can be merged', async () => {
+            const prDetails = {
+                pullRequestId: 100,
+                title: 'Clean PR',
+                lastMergeSourceCommit: { commitId: 'def456' },
+                mergeStatus: 'succeeded',
+            };
+            mockClient.get.mockResolvedValue({ data: prDetails });
+
+            const result = await prManager.getPrDetails('proj', 'repo', 100);
+
+            expect(result.mergeStatus).toBe('succeeded');
         });
     });
 

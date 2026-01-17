@@ -43,6 +43,10 @@ export interface CastVoteOptions {
     vote: VoteValue;
 }
 
+export interface CompletePrOptions {
+    bypassPolicy?: boolean;
+}
+
 /**
  * Pull Request operations for Azure DevOps.
  */
@@ -115,8 +119,15 @@ export class PrManager {
 
     /**
      * Completes a pull request (merge).
+     * @param options.bypassPolicy - If true, bypasses branch policies (requires appropriate permissions)
      */
-    async completePr(project: string, repoId: string, prId: number, lastMergeSourceCommit: string): Promise<void> {
+    async completePr(
+        project: string,
+        repoId: string,
+        prId: number,
+        lastMergeSourceCommit: string,
+        options?: CompletePrOptions
+    ): Promise<void> {
         await this.client.patch(
             `/${project}/_apis/git/repositories/${repoId}/pullrequests/${prId}`,
             {
@@ -125,11 +136,23 @@ export class PrManager {
                 completionOptions: {
                     deleteSourceBranch: false,
                     mergeStrategy: 'squash',
+                    bypassPolicy: options?.bypassPolicy ?? false,
+                    bypassReason: options?.bypassPolicy ? 'Automated seeding - conflict auto-resolution' : undefined,
                 },
             },
             { params: { 'api-version': '7.1' } }
         );
     }
+
+    /**
+     * Merge status returned by Azure DevOps.
+     * - 'succeeded': PR can be merged without conflicts
+     * - 'conflicts': PR has merge conflicts that must be resolved
+     * - 'failure': Merge evaluation failed
+     * - 'notSet': Merge status not yet computed
+     * - 'queued': Merge evaluation is queued
+     */
+    // Note: mergeStatus type is defined inline in the return type below
 
     /**
      * Gets a pull request by ID.
@@ -138,7 +161,12 @@ export class PrManager {
         project: string,
         repoId: string,
         prId: number
-    ): Promise<PullRequest & { lastMergeSourceCommit: { commitId: string } }> {
+    ): Promise<
+        PullRequest & {
+            lastMergeSourceCommit: { commitId: string };
+            mergeStatus?: 'succeeded' | 'conflicts' | 'failure' | 'notSet' | 'queued';
+        }
+    > {
         const response = await this.client.get(`/${project}/_apis/git/repositories/${repoId}/pullrequests/${prId}`, {
             params: { 'api-version': '7.1' },
         });
