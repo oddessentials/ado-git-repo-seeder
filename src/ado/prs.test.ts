@@ -239,6 +239,34 @@ describe('PrManager', () => {
             });
             expect(result).toEqual(prDetails);
         });
+
+        it('returns mergeStatus when PR has conflicts', async () => {
+            const prDetails = {
+                pullRequestId: 100,
+                title: 'Conflicting PR',
+                lastMergeSourceCommit: { commitId: 'abc123' },
+                mergeStatus: 'conflicts',
+            };
+            mockClient.get.mockResolvedValue({ data: prDetails });
+
+            const result = await prManager.getPrDetails('proj', 'repo', 100);
+
+            expect(result.mergeStatus).toBe('conflicts');
+        });
+
+        it('returns mergeStatus when PR can be merged', async () => {
+            const prDetails = {
+                pullRequestId: 100,
+                title: 'Clean PR',
+                lastMergeSourceCommit: { commitId: 'def456' },
+                mergeStatus: 'succeeded',
+            };
+            mockClient.get.mockResolvedValue({ data: prDetails });
+
+            const result = await prManager.getPrDetails('proj', 'repo', 100);
+
+            expect(result.mergeStatus).toBe('succeeded');
+        });
     });
 
     describe('getPolicyConfigurations', () => {
