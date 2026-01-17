@@ -147,10 +147,7 @@ describe('resolveConflicts integration scenarios', () => {
 
         it('PR with mergeStatus=succeeded skips resolution', () => {
             // No conflict resolution needed
-            const flow = [
-                'getPrDetails (check mergeStatus)',
-                'completePr (bypassPolicy: true)',
-            ];
+            const flow = ['getPrDetails (check mergeStatus)', 'completePr (bypassPolicy: true)'];
             expect(flow).toHaveLength(2);
         });
     });

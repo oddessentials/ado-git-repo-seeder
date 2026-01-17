@@ -138,13 +138,7 @@ describe('PR Conflict Resolution', () => {
             // Test that completePr accepts bypassPolicy option
             await mockInstance.completePr('proj', 'repo', 100, 'abc123', { bypassPolicy: true });
 
-            expect(mockInstance.completePr).toHaveBeenCalledWith(
-                'proj',
-                'repo',
-                100,
-                'abc123',
-                { bypassPolicy: true }
-            );
+            expect(mockInstance.completePr).toHaveBeenCalledWith('proj', 'repo', 100, 'abc123', { bypassPolicy: true });
         });
 
         it('calls resolveConflicts when PR has conflicts', async () => {
@@ -243,12 +237,7 @@ describe('resolveConflicts method contract', () => {
     it('returns resolved: true on success', async () => {
         const mockResolveConflicts = vi.fn().mockResolvedValue({ resolved: true });
 
-        const result = await mockResolveConflicts(
-            'https://example.com/repo',
-            'token',
-            'feature-branch',
-            'main'
-        );
+        const result = await mockResolveConflicts('https://example.com/repo', 'token', 'feature-branch', 'main');
 
         expect(result).toEqual({ resolved: true });
     });
@@ -259,12 +248,7 @@ describe('resolveConflicts method contract', () => {
             error: 'Clone failed: network error',
         });
 
-        const result = await mockResolveConflicts(
-            'https://example.com/repo',
-            'token',
-            'feature-branch',
-            'main'
-        );
+        const result = await mockResolveConflicts('https://example.com/repo', 'token', 'feature-branch', 'main');
 
         expect(result.resolved).toBe(false);
         expect(result.error).toBeDefined();
@@ -276,10 +260,6 @@ describe('resolveConflicts method contract', () => {
         // Call without targetBranch (should default to 'main')
         await mockResolveConflicts('https://example.com/repo', 'token', 'feature-branch');
 
-        expect(mockResolveConflicts).toHaveBeenCalledWith(
-            'https://example.com/repo',
-            'token',
-            'feature-branch'
-        );
+        expect(mockResolveConflicts).toHaveBeenCalledWith('https://example.com/repo', 'token', 'feature-branch');
     });
 });
