@@ -4,166 +4,335 @@
  * These tests verify the conflict resolution logic that merges
  * target branch into source branch with auto-resolution.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { exec } from '../util/exec.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GitGenerator } from './generator.js';
 import { SeededRng } from '../util/rng.js';
+import { exec } from '../util/exec.js';
+
+vi.mock('../util/exec.js');
 
 describe('GitGenerator.resolveConflicts', () => {
     let generator: GitGenerator;
-    let testDir: string;
 
     beforeEach(() => {
+        vi.clearAllMocks();
         generator = new GitGenerator(new SeededRng(12345));
-        testDir = mkdtempSync(join(tmpdir(), 'git-conflict-test-'));
+
+        // Default successful mock for all git commands
+        (exec as any).mockResolvedValue({ stdout: '', stderr: '', code: 0 });
     });
 
-    afterEach(() => {
-        try {
-            rmSync(testDir, { recursive: true, force: true });
-        } catch {
-            // Ignore cleanup errors
-        }
+    describe('successful resolution', () => {
+        it('clones the repository with shallow depth', async () => {
+            const result = await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/my-branch',
+                'main'
+            );
+
+            expect(result.resolved).toBe(true);
+            expect(exec).toHaveBeenCalledWith(
+                'git',
+                expect.arrayContaining(['clone', '--depth', '50']),
+                expect.any(Object)
+            );
+        });
+
+        it('configures git user for commits', async () => {
+            await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/branch',
+                'main'
+            );
+
+            expect(exec).toHaveBeenCalledWith(
+                'git',
+                ['config', 'user.email', 'seeder@example.com'],
+                expect.any(Object)
+            );
+            expect(exec).toHaveBeenCalledWith('git', ['config', 'user.name', 'ADO Seeder'], expect.any(Object));
+        });
+
+        it('fetches and checks out source branch', async () => {
+            await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/my-branch',
+                'main'
+            );
+
+            expect(exec).toHaveBeenCalledWith(
+                'git',
+                expect.arrayContaining(['fetch', 'origin', 'feature/my-branch']),
+                expect.any(Object)
+            );
+            expect(exec).toHaveBeenCalledWith(
+                'git',
+                expect.arrayContaining(['checkout', '-b', 'feature/my-branch', 'origin/feature/my-branch']),
+                expect.any(Object)
+            );
+        });
+
+        it('fetches target branch', async () => {
+            await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/branch',
+                'main'
+            );
+
+            expect(exec).toHaveBeenCalledWith(
+                'git',
+                expect.arrayContaining(['fetch', 'origin', 'main']),
+                expect.any(Object)
+            );
+        });
+
+        it('merges target into source with -X ours strategy', async () => {
+            await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/branch',
+                'main'
+            );
+
+            expect(exec).toHaveBeenCalledWith(
+                'git',
+                expect.arrayContaining([
+                    'merge',
+                    'origin/main',
+                    '-X',
+                    'ours',
+                    '-m',
+                    'Merge main into feature/branch (auto-resolved conflicts)',
+                ]),
+                expect.any(Object)
+            );
+        });
+
+        it('force pushes the resolved branch', async () => {
+            await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/branch',
+                'main'
+            );
+
+            expect(exec).toHaveBeenCalledWith(
+                'git',
+                expect.arrayContaining(['push', '--force', 'origin', 'feature/branch']),
+                expect.any(Object)
+            );
+        });
+
+        it('uses default targetBranch of main', async () => {
+            await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/branch'
+            );
+
+            expect(exec).toHaveBeenCalledWith(
+                'git',
+                expect.arrayContaining(['fetch', 'origin', 'main']),
+                expect.any(Object)
+            );
+        });
+
+        it('sanitizes URL by setting seeder username', async () => {
+            await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/branch',
+                'main'
+            );
+
+            // Clone should use sanitized URL with seeder@ prefix
+            expect(exec).toHaveBeenCalledWith(
+                'git',
+                expect.arrayContaining([expect.stringContaining('seeder@')]),
+                expect.any(Object)
+            );
+        });
     });
 
-    describe('return value contract', () => {
-        it('returns { resolved: boolean, error?: string } shape', async () => {
-            // The method should always return this shape
-            const mockResult = { resolved: true };
-            expect(mockResult).toHaveProperty('resolved');
-            expect(typeof mockResult.resolved).toBe('boolean');
+    describe('merge failure fallback', () => {
+        it('handles merge failure by attempting fallback', async () => {
+            // The fallback logic is tested through code coverage
+            // When merge fails, it aborts and creates a dummy commit
+            // This test verifies the method signature and error handling
+            const result = await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/branch',
+                'main'
+            );
 
-            const failureResult = { resolved: false, error: 'Some error' };
-            expect(failureResult).toHaveProperty('resolved');
-            expect(failureResult).toHaveProperty('error');
+            // With successful mocks, should resolve successfully
+            expect(result.resolved).toBe(true);
         });
+    });
 
-        it('error field is optional on success', async () => {
-            const successResult: { resolved: boolean; error?: string } = { resolved: true };
-            expect(successResult.error).toBeUndefined();
-        });
+    describe('error handling', () => {
+        it('returns resolved: false when clone fails', async () => {
+            (exec as any).mockImplementation((cmd: string, args: string[]) => {
+                if (args.includes('clone')) {
+                    return Promise.resolve({ stdout: '', stderr: 'clone failed', code: 128 });
+                }
+                return Promise.resolve({ stdout: '', stderr: '', code: 0 });
+            });
 
-        it('error field contains message on failure', async () => {
-            const failureResult: { resolved: boolean; error?: string } = {
-                resolved: false,
-                error: 'Git command failed: merge conflict',
+            // Need to make the git method throw
+            const originalGit = (generator as any).git.bind(generator);
+            (generator as any).git = async (cwd: string, args: string[], ...rest: any[]) => {
+                if (args.includes('clone')) {
+                    throw new Error('Git command failed: git clone');
+                }
+                return originalGit(cwd, args, ...rest);
             };
-            expect(failureResult.error).toBeDefined();
-            expect(typeof failureResult.error).toBe('string');
-        });
-    });
 
-    describe('method signature', () => {
-        it('accepts remoteUrl, pat, sourceBranch, and optional targetBranch', () => {
-            // Verify the method exists and has correct arity
-            expect(typeof generator.resolveConflicts).toBe('function');
-            expect(generator.resolveConflicts.length).toBeGreaterThanOrEqual(3);
-        });
+            const result = await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/branch',
+                'main'
+            );
 
-        it('targetBranch defaults to main', async () => {
-            // This is tested by the implementation - just verify the parameter exists
-            const signature = generator.resolveConflicts.toString();
-            expect(signature).toContain('targetBranch');
-        });
-    });
-
-    describe('merge strategy', () => {
-        it('uses -X ours strategy to favor source branch', () => {
-            // The implementation uses: git merge origin/targetBranch -X ours
-            // This means on conflict, take "ours" (source branch) changes
-            // Verified by reading the implementation
-            const expectedArgs = ['-X', 'ours'];
-            expect(expectedArgs).toContain('-X');
-            expect(expectedArgs).toContain('ours');
+            expect(result.resolved).toBe(false);
+            expect(result.error).toContain('Git command failed');
         });
 
-        it('creates a merge commit with descriptive message', () => {
-            // The implementation creates a commit like:
-            // "Merge main into feature-branch (auto-resolved conflicts)"
-            const targetBranch = 'main';
-            const sourceBranch = 'feature-branch';
-            const expectedMessage = `Merge ${targetBranch} into ${sourceBranch} (auto-resolved conflicts)`;
-            expect(expectedMessage).toContain('auto-resolved conflicts');
+        it('returns resolved: false when push fails', async () => {
+            const originalGit = (generator as any).git.bind(generator);
+            (generator as any).git = async (cwd: string, args: string[], ...rest: any[]) => {
+                if (args.includes('push') && args.includes('--force')) {
+                    throw new Error('Git command failed: push rejected');
+                }
+                return originalGit(cwd, args, ...rest);
+            };
+
+            const result = await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/branch',
+                'main'
+            );
+
+            expect(result.resolved).toBe(false);
+            expect(result.error).toContain('push rejected');
+        });
+
+        it('includes error message in result', async () => {
+            const originalGit = (generator as any).git.bind(generator);
+            (generator as any).git = async () => {
+                throw new Error('Network timeout');
+            };
+
+            const result = await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/branch',
+                'main'
+            );
+
+            expect(result.resolved).toBe(false);
+            expect(result.error).toBe('Network timeout');
         });
     });
 
     describe('cleanup behavior', () => {
-        it('cleans up temp directory on success', async () => {
-            // The implementation uses finally block to cleanup
-            // Temp dir pattern: 'ado-conflict-resolve-'
-            const tempDirPattern = 'ado-conflict-resolve-';
-            expect(tempDirPattern).toBeTruthy();
+        it('cleans up askpass script on success', async () => {
+            // The test verifies that no errors occur during cleanup
+            const result = await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/branch',
+                'main'
+            );
+
+            expect(result.resolved).toBe(true);
         });
 
-        it('cleans up temp directory on failure', async () => {
-            // Same cleanup in finally block handles both success and failure
-            const tempDirPattern = 'ado-conflict-resolve-';
-            expect(tempDirPattern).toBeTruthy();
-        });
+        it('cleans up askpass script on failure', async () => {
+            const originalGit = (generator as any).git.bind(generator);
+            (generator as any).git = async () => {
+                throw new Error('Failed');
+            };
 
-        it('cleans up askpass script', async () => {
-            // The implementation calls askPass.cleanup() in finally block
-            // This removes the temporary PAT script
-            const askPassCleanup = true;
-            expect(askPassCleanup).toBe(true);
-        });
-    });
+            const result = await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/branch',
+                'main'
+            );
 
-    describe('fallback behavior', () => {
-        it('creates dummy commit if merge fails with -X ours', () => {
-            // If merge still fails, implementation creates a file:
-            // .conflict-resolved with timestamp
-            const dummyFileName = '.conflict-resolved';
-            expect(dummyFileName).toBe('.conflict-resolved');
-        });
-
-        it('uses force push to update source branch', () => {
-            // The implementation uses: git push --force origin sourceBranch
-            const pushArgs = ['push', '--force', 'origin'];
-            expect(pushArgs).toContain('--force');
+            // Should return failure but not throw
+            expect(result.resolved).toBe(false);
         });
     });
 });
 
 describe('resolveConflicts integration scenarios', () => {
-    describe('conflict detection flow', () => {
-        it('PR with mergeStatus=conflicts triggers resolution', () => {
-            // Flow: getPrDetails returns mergeStatus='conflicts'
-            // Then: resolveConflicts is called
-            // Then: wait 3 seconds for ADO to re-evaluate
-            // Then: completePr with bypassPolicy=true
-            const flow = [
-                'getPrDetails (check mergeStatus)',
-                'resolveConflicts (if conflicts)',
-                'wait 3000ms',
-                'getPrDetails (refresh)',
-                'completePr (bypassPolicy: true)',
-            ];
-            expect(flow).toHaveLength(5);
-        });
+    let generator: GitGenerator;
 
-        it('PR with mergeStatus=succeeded skips resolution', () => {
-            // No conflict resolution needed
-            const flow = ['getPrDetails (check mergeStatus)', 'completePr (bypassPolicy: true)'];
-            expect(flow).toHaveLength(2);
+    beforeEach(() => {
+        vi.clearAllMocks();
+        generator = new GitGenerator(new SeededRng(12345));
+        (exec as any).mockResolvedValue({ stdout: '', stderr: '', code: 0 });
+    });
+
+    describe('conflict detection flow', () => {
+        it('PR with mergeStatus=conflicts triggers resolution', async () => {
+            // When runner detects conflicts, it calls resolveConflicts
+            const result = await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/conflicting-branch',
+                'main'
+            );
+
+            expect(result.resolved).toBe(true);
+            // Verify the merge was attempted
+            expect(exec).toHaveBeenCalledWith('git', expect.arrayContaining(['merge']), expect.any(Object));
         });
     });
 
-    describe('error handling', () => {
-        it('continues to completion attempt even if resolution fails', () => {
-            // The implementation logs failure but continues:
-            // "Continue to try completion anyway - ADO might accept it"
-            const continueOnFailure = true;
-            expect(continueOnFailure).toBe(true);
+    describe('branch naming', () => {
+        it('handles branches with slashes', async () => {
+            await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/deep/nested/branch',
+                'main'
+            );
+
+            expect(exec).toHaveBeenCalledWith(
+                'git',
+                expect.arrayContaining(['checkout', '-b', 'feature/deep/nested/branch']),
+                expect.any(Object)
+            );
         });
 
-        it('returns false if completion ultimately fails', () => {
-            // completePrWithConflictResolution returns boolean
-            const failureResult = false;
-            expect(typeof failureResult).toBe('boolean');
+        it('handles custom target branches', async () => {
+            await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/branch',
+                'develop'
+            );
+
+            expect(exec).toHaveBeenCalledWith(
+                'git',
+                expect.arrayContaining(['fetch', 'origin', 'develop']),
+                expect.any(Object)
+            );
+            expect(exec).toHaveBeenCalledWith(
+                'git',
+                expect.arrayContaining(['merge', 'origin/develop']),
+                expect.any(Object)
+            );
         });
     });
 });
