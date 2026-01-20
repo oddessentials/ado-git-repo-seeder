@@ -49,16 +49,27 @@ describe('Multi-Run Robustness (Simulated)', () => {
             get: vi.fn().mockImplementation((url) => {
                 const lowUrl = url.toLowerCase();
                 if (lowUrl.includes('_apis/policy/configurations')) return Promise.resolve({ data: { value: [] } });
-                if (lowUrl.includes('_apis/git/repositories/repo1'))
-                    return Promise.resolve({ data: { id: 'repo-id-1', remoteUrl: 'https://fake/Repo1' } });
-                if (lowUrl.includes('_apis/git/repositories'))
-                    return Promise.resolve({ data: { value: [{ name: 'Repo1', id: 'repo-id-1' }] } });
                 if (lowUrl.includes('_apis/identities'))
                     return Promise.resolve({ data: { value: [{ id: 'user-id-1' }] } });
+                // Check for specific PR by ID (must come before general pullrequests check)
                 if (lowUrl.includes('pullrequests/'))
                     return Promise.resolve({
-                        data: { pullRequestId: 101, lastMergeSourceCommit: { commitId: 'abc' } },
+                        data: {
+                            pullRequestId: 101,
+                            lastMergeSourceCommit: { commitId: 'abc' },
+                            mergeStatus: 'succeeded',
+                        },
                     });
+                // Check for PR list (no trailing ID)
+                if (lowUrl.includes('/pullrequests')) return Promise.resolve({ data: { value: [] } });
+                // Check for specific repo by name
+                if (lowUrl.includes('_apis/git/repositories/repo1'))
+                    return Promise.resolve({
+                        data: { id: 'repo-id-1', name: 'Repo1', remoteUrl: 'https://fake/Repo1' },
+                    });
+                // Check for repo list
+                if (lowUrl.includes('_apis/git/repositories'))
+                    return Promise.resolve({ data: { value: [{ name: 'Repo1', id: 'repo-id-1' }] } });
                 return Promise.resolve({ data: {} });
             }),
             post: vi.fn().mockResolvedValue({ data: { pullRequestId: 101 } }),
