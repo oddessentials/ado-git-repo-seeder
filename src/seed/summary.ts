@@ -74,7 +74,21 @@ export function generateMarkdownSummary(summary: SeedSummary): string {
         lines.push('');
     }
 
-    // Statistics
+    // Handle cleanup mode differently - show cleanup statistics prominently
+    if (summary.cleanupMode && summary.cleanupStats) {
+        lines.push(`## 🧹 Cleanup Mode`);
+        lines.push('');
+        lines.push('Open PR count exceeded threshold. Cleanup mode prioritized completing existing PRs.');
+        lines.push('');
+        lines.push(`## Statistics`);
+        lines.push(`- **PRs Completed:** ${summary.cleanupStats.prsCompleted}`);
+        lines.push(`- **Drafts Published:** ${summary.cleanupStats.draftsPublished}`);
+        lines.push(`- **PRs Failed:** ${summary.cleanupStats.prsFailed}`);
+        lines.push('');
+        return lines.join('\n');
+    }
+
+    // Normal seeding mode statistics
     const totalRepos = summary.repos.length;
     const totalPrs = summary.repos.reduce((sum, r) => sum + r.prs.length, 0);
     const totalBranches = summary.repos.reduce((sum, r) => sum + r.branchesCreated, 0);
