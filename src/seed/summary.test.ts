@@ -161,5 +161,86 @@ describe('summary', () => {
             expect(md).toContain('PR #5');
             expect(md).toContain('Network error');
         });
+
+        describe('cleanup mode', () => {
+            it('shows cleanup mode header and statistics when cleanupMode is true', () => {
+                const cleanupSummary: SeedSummary = {
+                    ...baseSummary,
+                    repos: [], // Empty in cleanup mode
+                    cleanupMode: true,
+                    cleanupStats: {
+                        draftsPublished: 5,
+                        prsCompleted: 213,
+                        prsFailed: 2,
+                    },
+                };
+
+                const md = generateMarkdownSummary(cleanupSummary);
+
+                expect(md).toContain('Cleanup Mode');
+                expect(md).toContain('PRs Completed:** 213');
+                expect(md).toContain('Drafts Published:** 5');
+                expect(md).toContain('PRs Failed:** 2');
+            });
+
+            it('does not show normal statistics in cleanup mode', () => {
+                const cleanupSummary: SeedSummary = {
+                    ...baseSummary,
+                    repos: [],
+                    cleanupMode: true,
+                    cleanupStats: {
+                        draftsPublished: 0,
+                        prsCompleted: 50,
+                        prsFailed: 0,
+                    },
+                };
+
+                const md = generateMarkdownSummary(cleanupSummary);
+
+                // Should NOT contain normal seeding stats
+                expect(md).not.toContain('Repositories:**');
+                expect(md).not.toContain('Branches Created:**');
+                expect(md).not.toContain('Non-Fatal Failures:**');
+            });
+
+            it('includes cleanup explanation text', () => {
+                const cleanupSummary: SeedSummary = {
+                    ...baseSummary,
+                    cleanupMode: true,
+                    cleanupStats: {
+                        draftsPublished: 0,
+                        prsCompleted: 10,
+                        prsFailed: 0,
+                    },
+                };
+
+                const md = generateMarkdownSummary(cleanupSummary);
+
+                expect(md).toContain('threshold');
+                expect(md).toContain('prioritized');
+            });
+
+            it('still shows fatal failure in cleanup mode', () => {
+                const cleanupWithFatal: SeedSummary = {
+                    ...baseSummary,
+                    cleanupMode: true,
+                    cleanupStats: {
+                        draftsPublished: 0,
+                        prsCompleted: 0,
+                        prsFailed: 0,
+                    },
+                    fatalFailure: {
+                        phase: 'identity-resolution',
+                        error: 'Failed to resolve user',
+                    },
+                };
+
+                const md = generateMarkdownSummary(cleanupWithFatal);
+
+                expect(md).toContain('Fatal Failure');
+                expect(md).toContain('identity-resolution');
+                expect(md).toContain('Failed to resolve user');
+            });
+        });
     });
 });
