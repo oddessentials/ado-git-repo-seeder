@@ -633,13 +633,17 @@ export class SeedRunner {
 
     /**
      * Attempts to complete a PR with automatic conflict resolution.
-     * Handles all merge status values including: succeeded, conflicts, failure, notSet, queued, undefined.
+     *
+     * IMPORTANT: Only resolves conflicts when mergeStatus is explicitly 'conflicts'.
+     * For other statuses (notSet, queued, undefined), we try completion directly -
+     * ADO will reject if not ready, and we'll retry. This avoids unnecessary
+     * force-pushes that invalidate ADO's merge evaluation.
      *
      * Flow:
-     * 1. Wait for merge status to be evaluated (poll if notSet/queued)
-     * 2. If conflicts or failure, resolve them by merging target into source
-     * 3. Wait for ADO to re-evaluate and verify resolution succeeded
-     * 4. Complete with bypassPolicy enabled
+     * 1. Get PR details (with short wait for evaluation if needed)
+     * 2. If mergeStatus is 'conflicts', resolve by merging target into source
+     * 3. Try completion with bypassPolicy enabled
+     * 4. On failure, retry with backoff
      *
      * @returns true if PR was completed successfully
      */
@@ -653,33 +657,33 @@ export class SeedRunner {
         targetBranch: string = 'main'
     ): Promise<boolean> {
         const maxRetries = 3;
+        let conflictResolutionAttempted = false;
 
         for (let attempt = 0; attempt < maxRetries; attempt++) {
             try {
-                // Step 1: Wait for merge status to be evaluated
-                let prDetails = await this.waitForMergeStatusEvaluation(project, repoId, prId);
+                // Step 1: Get PR details, with a short wait for merge status if this is first attempt
+                let prDetails = await this.prManager.getPrDetails(project, repoId, prId);
 
-                // If timeout waiting for evaluation, try to force resolution anyway
-                if (!prDetails) {
-                    console.log(`   ⚠️  PR #${prId} merge status unknown, attempting force resolution...`);
-                    prDetails = await this.prManager.getPrDetails(project, repoId, prId);
+                // On first attempt, give ADO a moment to evaluate merge status if it's pending
+                if (
+                    attempt === 0 &&
+                    (!prDetails.mergeStatus || prDetails.mergeStatus === 'notSet' || prDetails.mergeStatus === 'queued')
+                ) {
+                    const evaluated = await this.waitForMergeStatusEvaluation(project, repoId, prId, 10000);
+                    if (evaluated) {
+                        prDetails = evaluated;
+                    }
                 }
 
                 const mergeStatus = prDetails.mergeStatus;
 
-                // Step 2: Determine if conflict resolution is needed
-                // Treat 'conflicts', 'failure', undefined, 'notSet', 'queued' as needing resolution
-                const needsResolution =
-                    mergeStatus === 'conflicts' ||
-                    mergeStatus === 'failure' ||
-                    mergeStatus === undefined ||
-                    mergeStatus === 'notSet' ||
-                    mergeStatus === 'queued';
+                // Step 2: ONLY resolve conflicts when explicitly reported as 'conflicts'
+                // Do NOT resolve for: notSet, queued, undefined, failure, succeeded
+                // This prevents unnecessary force-pushes that break the completion flow
+                const needsResolution = mergeStatus === 'conflicts' && !conflictResolutionAttempted;
 
                 if (needsResolution) {
-                    console.log(
-                        `   ⚠️  PR #${prId} has merge status '${mergeStatus ?? 'undefined'}', auto-resolving...`
-                    );
+                    console.log(`   ⚠️  PR #${prId} has merge conflicts, auto-resolving...`);
 
                     // Resolve conflicts by merging target into source with -X ours
                     const resolution = await this.gitGenerator.resolveConflicts(
@@ -691,47 +695,52 @@ export class SeedRunner {
 
                     if (!resolution.resolved) {
                         console.log(`   ❌ Conflict resolution failed for PR #${prId}: ${resolution.error}`);
+                        // Don't set conflictResolutionAttempted - allow retry on next attempt
+                        // This handles transient failures (network errors, etc.)
                         // Continue to try completion anyway - bypassPolicy might help
                     } else {
                         console.log(`   ✅ Conflicts resolved for PR #${prId}`);
-                    }
+                        // Only mark as attempted when resolution actually succeeded
+                        // This prevents unnecessary re-resolution while allowing retry after transient failures
+                        conflictResolutionAttempted = true;
 
-                    // Step 3: Wait for ADO to re-evaluate merge status after resolution
-                    const refreshed = await this.waitForMergeStatusEvaluation(project, repoId, prId, 15000);
-
-                    if (refreshed) {
-                        // Verify resolution was successful
-                        if (refreshed.mergeStatus === 'conflicts') {
-                            console.log(
-                                `   ⚠️  PR #${prId} still shows conflicts after resolution, forcing completion...`
-                            );
+                        // Wait for ADO to re-evaluate merge status after our push
+                        const refreshed = await this.waitForMergeStatusEvaluation(project, repoId, prId, 15000);
+                        if (refreshed) {
+                            prDetails = refreshed;
+                        } else {
+                            // Timeout - get latest details and continue
+                            prDetails = await this.prManager.getPrDetails(project, repoId, prId);
                         }
-                        prDetails = refreshed;
-                    } else {
-                        // Timeout - refresh and try anyway
-                        prDetails = await this.prManager.getPrDetails(project, repoId, prId);
                     }
                 }
 
-                // Step 4: Complete the PR
-                // Safely get commitId, falling back to empty string if not available
+                // Step 3: Complete the PR
                 const commitId = prDetails.lastMergeSourceCommit?.commitId;
                 if (!commitId) {
-                    console.log(`   ⚠️  PR #${prId} missing lastMergeSourceCommit, attempting completion anyway...`);
+                    // If commitId is missing, ADO likely hasn't evaluated yet
+                    // Throw to trigger retry with backoff rather than sending empty commitId
+                    throw Object.assign(
+                        new Error(`PR #${prId} missing lastMergeSourceCommit - ADO may still be evaluating`),
+                        { status: 409 }
+                    );
                 }
 
-                await this.prManager.completePr(project, repoId, prId, commitId ?? '', {
+                await this.prManager.completePr(project, repoId, prId, commitId, {
                     bypassPolicy: true,
                 });
 
                 return true;
             } catch (error: any) {
-                // Retry on 409 (Conflict) - usually means PR is being updated
-                if (error.status === 409 && attempt < maxRetries - 1) {
+                const isRetryable = error.status === 409 || error.status === 400;
+
+                // Retry on 409 (Conflict) or 400 (Bad Request) - usually means PR is being updated or not ready
+                if (isRetryable && attempt < maxRetries - 1) {
+                    const waitTime = 2000 * (attempt + 1);
                     console.log(
-                        `   🔄 PR #${prId} update conflict (409), retrying (attempt ${attempt + 2}/${maxRetries})...`
+                        `   🔄 PR #${prId} not ready (${error.status}), retrying in ${waitTime / 1000}s (attempt ${attempt + 2}/${maxRetries})...`
                     );
-                    await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+                    await new Promise((r) => setTimeout(r, waitTime));
                     continue;
                 }
 

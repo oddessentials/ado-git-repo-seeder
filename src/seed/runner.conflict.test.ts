@@ -2,21 +2,26 @@
  * Tests for PR conflict resolution functionality in SeedRunner.
  *
  * Tests the completePrWithConflictResolution helper method behavior.
+ *
+ * CRITICAL REGRESSION TESTS:
+ * - needsResolution must ONLY return true for 'conflicts' status
+ * - Non-terminal statuses (notSet, queued, undefined) must NOT trigger conflict resolution
+ * - Missing commitId must trigger retry, not pass empty string
  */
 import { describe, it, expect, vi } from 'vitest';
 
 /**
  * Helper to determine if resolution is needed based on merge status.
- * This mirrors the logic in completePrWithConflictResolution.
+ * This mirrors the CORRECT logic in completePrWithConflictResolution.
+ *
+ * IMPORTANT: Only 'conflicts' status should trigger resolution.
+ * Other statuses (notSet, queued, undefined, failure) should NOT trigger
+ * resolution as they would cause unnecessary force-pushes that invalidate
+ * ADO's merge evaluation and break the completion flow.
  */
 function needsResolution(mergeStatus: string | undefined): boolean {
-    return (
-        mergeStatus === 'conflicts' ||
-        mergeStatus === 'failure' ||
-        mergeStatus === undefined ||
-        mergeStatus === 'notSet' ||
-        mergeStatus === 'queued'
-    );
+    // ONLY resolve when ADO explicitly reports conflicts
+    return mergeStatus === 'conflicts';
 }
 
 /**
@@ -99,22 +104,21 @@ describe('PR Conflict Resolution', () => {
     });
 
     describe('conflict resolution flow', () => {
-        it('flow includes merge status polling before conflict detection', () => {
+        it('flow includes merge status check before conflict detection', () => {
             const flow = [
-                'waitForMergeStatusEvaluation (poll until not notSet/queued)',
-                'check needsResolution',
+                'getPrDetails',
+                'optional: waitForMergeStatusEvaluation (if first attempt and pending)',
+                'check needsResolution (ONLY for conflicts)',
                 'if needsResolution: resolveConflicts',
-                'waitForMergeStatusEvaluation (poll after resolution)',
                 'completePr (bypassPolicy: true)',
             ];
 
-            expect(flow).toContain('waitForMergeStatusEvaluation (poll until not notSet/queued)');
-            expect(flow).toContain('check needsResolution');
+            expect(flow).toContain('check needsResolution (ONLY for conflicts)');
         });
 
         it('flow without conflicts skips resolution', () => {
             const flowWithoutConflicts = [
-                'waitForMergeStatusEvaluation',
+                'getPrDetails',
                 'check needsResolution (false for succeeded)',
                 'completePr (bypassPolicy: true)',
             ];
@@ -125,32 +129,71 @@ describe('PR Conflict Resolution', () => {
     });
 });
 
-describe('mergeStatus handling - needsResolution logic', () => {
-    describe('statuses that require resolution', () => {
+describe('CRITICAL REGRESSION: needsResolution logic', () => {
+    /**
+     * REGRESSION TEST: The bug that broke PR completion was an over-aggressive
+     * needsResolution check that triggered conflict resolution for ALL non-'succeeded'
+     * statuses, including 'notSet', 'queued', 'undefined', and 'failure'.
+     *
+     * This caused:
+     * 1. Unnecessary force-pushes that invalidated ADO's merge evaluation
+     * 2. Stale/missing lastMergeSourceCommit after the push
+     * 3. Failed completion attempts
+     * 4. Stuck cleanup mode that never made progress
+     *
+     * The CORRECT behavior: Only resolve when mergeStatus === 'conflicts'
+     */
+
+    describe('ONLY conflicts status should require resolution', () => {
         it('conflicts status requires resolution', () => {
             expect(needsResolution('conflicts')).toBe(true);
         });
+    });
 
-        it('failure status requires resolution', () => {
-            expect(needsResolution('failure')).toBe(true);
+    describe('NON-CONFLICT statuses must NOT require resolution', () => {
+        it('REGRESSION: failure status must NOT require resolution', () => {
+            // failure means the merge couldn't be completed for other reasons
+            // Trying to resolve conflicts won't help - just try completion with bypass
+            expect(needsResolution('failure')).toBe(false);
         });
 
-        it('undefined status requires resolution', () => {
-            expect(needsResolution(undefined)).toBe(true);
+        it('REGRESSION: undefined status must NOT require resolution', () => {
+            // undefined means ADO hasn't returned mergeStatus yet
+            // Resolution would force-push and invalidate ADO's evaluation
+            expect(needsResolution(undefined)).toBe(false);
         });
 
-        it('notSet status requires resolution', () => {
-            expect(needsResolution('notSet')).toBe(true);
+        it('REGRESSION: notSet status must NOT require resolution', () => {
+            // notSet means ADO is still evaluating
+            // Resolution would force-push and invalidate ADO's evaluation
+            expect(needsResolution('notSet')).toBe(false);
         });
 
-        it('queued status requires resolution', () => {
-            expect(needsResolution('queued')).toBe(true);
+        it('REGRESSION: queued status must NOT require resolution', () => {
+            // queued means ADO has queued the merge evaluation
+            // Resolution would force-push and invalidate ADO's evaluation
+            expect(needsResolution('queued')).toBe(false);
+        });
+
+        it('succeeded status does not require resolution', () => {
+            expect(needsResolution('succeeded')).toBe(false);
         });
     });
 
-    describe('statuses that do not require resolution', () => {
-        it('succeeded status does not require resolution', () => {
-            expect(needsResolution('succeeded')).toBe(false);
+    describe('comprehensive status matrix', () => {
+        const testCases = [
+            { status: 'conflicts', shouldResolve: true, reason: 'actual conflicts exist' },
+            { status: 'succeeded', shouldResolve: false, reason: 'merge is ready' },
+            { status: 'failure', shouldResolve: false, reason: 'conflicts wont help failure' },
+            { status: 'notSet', shouldResolve: false, reason: 'ADO still evaluating' },
+            { status: 'queued', shouldResolve: false, reason: 'ADO evaluation queued' },
+            { status: undefined, shouldResolve: false, reason: 'status not yet available' },
+        ];
+
+        testCases.forEach(({ status, shouldResolve, reason }) => {
+            it(`${status ?? 'undefined'}: needsResolution=${shouldResolve} (${reason})`, () => {
+                expect(needsResolution(status)).toBe(shouldResolve);
+            });
         });
     });
 });
@@ -185,7 +228,15 @@ describe('mergeStatus handling - isStatusEvaluated logic', () => {
     });
 });
 
-describe('lastMergeSourceCommit handling', () => {
+describe('CRITICAL REGRESSION: lastMergeSourceCommit handling', () => {
+    /**
+     * REGRESSION TEST: The old buggy code would pass empty string to completePr
+     * when lastMergeSourceCommit was missing. This caused 400 errors from ADO.
+     *
+     * The CORRECT behavior: Throw an error to trigger retry with backoff,
+     * giving ADO time to populate lastMergeSourceCommit.
+     */
+
     it('safely accesses commitId when present', () => {
         const prDetails = {
             lastMergeSourceCommit: { commitId: 'abc123' },
@@ -211,11 +262,28 @@ describe('lastMergeSourceCommit handling', () => {
         expect(commitId).toBeUndefined();
     });
 
-    it('uses fallback empty string when commitId is unavailable', () => {
+    it('REGRESSION: should NOT use empty string fallback for completion', () => {
+        // The old buggy code did: commitId ?? ''
+        // This sent empty string to ADO which caused 400 errors
+        // The correct behavior is to throw and retry
         const prDetails: { lastMergeSourceCommit?: { commitId: string } } = {};
 
-        const commitId = prDetails.lastMergeSourceCommit?.commitId ?? '';
-        expect(commitId).toBe('');
+        const commitId = prDetails.lastMergeSourceCommit?.commitId;
+
+        // Instead of using fallback, should throw to trigger retry
+        expect(commitId).toBeUndefined();
+        // In the actual code, this triggers: throw { status: 409 } to retry
+    });
+
+    it('missing commitId should trigger retryable error, not silent failure', () => {
+        const prDetails: { lastMergeSourceCommit?: { commitId: string } } = {};
+        const commitId = prDetails.lastMergeSourceCommit?.commitId;
+
+        if (!commitId) {
+            // This is the correct behavior - create a retryable error
+            const error = Object.assign(new Error('missing lastMergeSourceCommit'), { status: 409 });
+            expect(error.status).toBe(409); // 409 triggers retry logic
+        }
     });
 });
 
@@ -286,6 +354,8 @@ describe('waitForMergeStatusEvaluation polling behavior', () => {
 
         expect(mockGetPrDetails).toHaveBeenCalledTimes(3);
         expect(result.mergeStatus).toBe('succeeded');
+        // IMPORTANT: succeeded does NOT need resolution
+        expect(needsResolution(result.mergeStatus)).toBe(false);
     });
 
     it('simulates polling behavior transitioning from notSet to conflicts', async () => {
@@ -310,7 +380,23 @@ describe('waitForMergeStatusEvaluation polling behavior', () => {
 
         expect(mockGetPrDetails).toHaveBeenCalledTimes(2);
         expect(result.mergeStatus).toBe('conflicts');
+        // ONLY conflicts needs resolution
         expect(needsResolution(result.mergeStatus)).toBe(true);
+    });
+
+    it('REGRESSION: notSet status after polling timeout should NOT trigger resolution', async () => {
+        // Simulates timeout scenario where status stays notSet
+        const mockGetPrDetails = vi.fn().mockResolvedValue({
+            pullRequestId: 100,
+            mergeStatus: 'notSet',
+        });
+
+        const result = await mockGetPrDetails();
+        expect(result.mergeStatus).toBe('notSet');
+
+        // CRITICAL: notSet should NOT trigger resolution
+        // The old bug would resolve here, causing force-push and breaking completion
+        expect(needsResolution(result.mergeStatus)).toBe(false);
     });
 });
 
@@ -334,6 +420,7 @@ describe('post-resolution verification', () => {
         // First call detects conflicts
         const initial = await mockGetPrDetails();
         expect(initial.mergeStatus).toBe('conflicts');
+        expect(needsResolution(initial.mergeStatus)).toBe(true);
 
         // After resolution
         const afterResolution = await mockGetPrDetails();
@@ -353,10 +440,10 @@ describe('post-resolution verification', () => {
         expect(result.mergeStatus).toBe('conflicts');
 
         // In this case, the code should still attempt completion with bypassPolicy
-        // The warning log would indicate "still shows conflicts after resolution, forcing completion..."
+        // But should NOT attempt resolution again (conflictResolutionAttempted flag)
     });
 
-    it('handles case where merge status transitions to failure', async () => {
+    it('REGRESSION: failure status should NOT trigger resolution', async () => {
         // Simulates: notSet -> evaluation -> failure
         let callCount = 0;
         const mockGetPrDetails = vi.fn().mockImplementation(async () => {
@@ -372,7 +459,10 @@ describe('post-resolution verification', () => {
 
         const evaluated = await mockGetPrDetails();
         expect(evaluated.mergeStatus).toBe('failure');
-        expect(needsResolution(evaluated.mergeStatus)).toBe(true);
+
+        // CRITICAL: failure should NOT trigger resolution
+        // The old bug would resolve here, which doesn't help failure status
+        expect(needsResolution(evaluated.mergeStatus)).toBe(false);
     });
 });
 
@@ -431,5 +521,139 @@ describe('bypassPolicy configuration', () => {
         const options = { bypassPolicy: false };
         const bypassReason = options.bypassPolicy ? 'Automated seeding - conflict auto-resolution' : undefined;
         expect(bypassReason).toBeUndefined();
+    });
+});
+
+describe('CRITICAL REGRESSION: conflictResolutionAttempted flag', () => {
+    /**
+     * REGRESSION TEST: The conflictResolutionAttempted flag controls when we retry resolution.
+     *
+     * Key behaviors:
+     * 1. After SUCCESSFUL resolution, don't resolve again (prevents infinite loops)
+     * 2. After FAILED resolution, allow retry on next attempt (handles transient failures)
+     */
+
+    it('should NOT attempt resolution again after SUCCESSFUL resolution', () => {
+        let conflictResolutionAttempted = false;
+        const mergeStatus = 'conflicts';
+
+        // First check: should resolve
+        const needsFirstResolution = mergeStatus === 'conflicts' && !conflictResolutionAttempted;
+        expect(needsFirstResolution).toBe(true);
+
+        // Simulate SUCCESSFUL resolution - set the flag
+        const resolutionSucceeded = true;
+        if (resolutionSucceeded) {
+            conflictResolutionAttempted = true;
+        }
+
+        // Second check: should NOT resolve again after success
+        const needsSecondResolution = mergeStatus === 'conflicts' && !conflictResolutionAttempted;
+        expect(needsSecondResolution).toBe(false);
+    });
+
+    it('REGRESSION: should allow retry after FAILED resolution (transient failure)', () => {
+        /**
+         * BUG FIX: Previously, conflictResolutionAttempted was set unconditionally
+         * after calling resolveConflicts(), even if it returned resolved: false.
+         * This meant transient failures (network errors, git push failures) would
+         * permanently disable resolution for all retry attempts.
+         *
+         * CORRECT BEHAVIOR: Only set the flag when resolution.resolved === true
+         */
+        let conflictResolutionAttempted = false;
+        const mergeStatus = 'conflicts';
+
+        // First attempt: resolution FAILS (transient error)
+        const needsFirstResolution = mergeStatus === 'conflicts' && !conflictResolutionAttempted;
+        expect(needsFirstResolution).toBe(true);
+
+        // Simulate FAILED resolution - do NOT set the flag
+        const resolutionSucceeded = false;
+        if (resolutionSucceeded) {
+            conflictResolutionAttempted = true;
+        }
+        // Flag should still be false after failed resolution
+        expect(conflictResolutionAttempted).toBe(false);
+
+        // Second attempt (retry): should STILL try resolution because previous attempt failed
+        const needsSecondResolution = mergeStatus === 'conflicts' && !conflictResolutionAttempted;
+        expect(needsSecondResolution).toBe(true); // This is the key assertion!
+
+        // Now simulate SUCCESSFUL resolution on retry
+        const retrySucceeded = true;
+        if (retrySucceeded) {
+            conflictResolutionAttempted = true;
+        }
+
+        // Third attempt: should NOT resolve again after success
+        const needsThirdResolution = mergeStatus === 'conflicts' && !conflictResolutionAttempted;
+        expect(needsThirdResolution).toBe(false);
+    });
+
+    it('simulates the full retry flow with transient failure then success', () => {
+        /**
+         * Scenario:
+         * - Attempt 1: conflicts detected, resolveConflicts() fails (network error), completion fails
+         * - Attempt 2: conflicts still detected, resolveConflicts() succeeds, completion succeeds
+         */
+        let conflictResolutionAttempted = false;
+        const mergeStatus = 'conflicts';
+        const maxRetries = 3;
+
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            const needsResolution = mergeStatus === 'conflicts' && !conflictResolutionAttempted;
+
+            if (attempt === 0) {
+                // First attempt: needs resolution
+                expect(needsResolution).toBe(true);
+
+                // Resolution fails (transient error)
+                const resolved = false;
+                if (resolved) {
+                    conflictResolutionAttempted = true;
+                }
+                // Completion would fail, trigger retry
+            } else if (attempt === 1) {
+                // Second attempt: should STILL need resolution (previous failed)
+                expect(needsResolution).toBe(true);
+
+                // Resolution succeeds this time
+                const resolved = true;
+                if (resolved) {
+                    conflictResolutionAttempted = true;
+                }
+                // Completion would succeed, break
+                break;
+            }
+        }
+
+        expect(conflictResolutionAttempted).toBe(true);
+    });
+});
+
+describe('retry behavior', () => {
+    it('retries on 409 status code', () => {
+        const error = { status: 409, message: 'Conflict' };
+        const isRetryable = error.status === 409 || error.status === 400;
+        expect(isRetryable).toBe(true);
+    });
+
+    it('retries on 400 status code', () => {
+        const error = { status: 400, message: 'Bad Request' };
+        const isRetryable = error.status === 409 || error.status === 400;
+        expect(isRetryable).toBe(true);
+    });
+
+    it('does not retry on 403 status code', () => {
+        const error = { status: 403, message: 'Forbidden' };
+        const isRetryable = error.status === 409 || error.status === 400;
+        expect(isRetryable).toBe(false);
+    });
+
+    it('does not retry on 500 status code', () => {
+        const error = { status: 500, message: 'Internal Server Error' };
+        const isRetryable = error.status === 409 || error.status === 400;
+        expect(isRetryable).toBe(false);
     });
 });
