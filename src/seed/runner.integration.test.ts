@@ -628,3 +628,321 @@ describe('conflictResolutionAttempted Flag Behavior', () => {
         expect(needsResolution).toBe(true);
     });
 });
+
+describe('Critical Edge Cases', () => {
+    let resolveConflictsCalls: number;
+    let completePrCalls: { commitId: string; options: any }[];
+
+    beforeEach(() => {
+        resolveConflictsCalls = 0;
+        completePrCalls = [];
+    });
+
+    describe('Max Retries Exhaustion', () => {
+        it('should fail after exactly 3 retries with 409 errors', async () => {
+            let attempts = 0;
+
+            const result = await completePrWithConflictResolution(100, {
+                getPrDetails: async () => ({
+                    mergeStatus: 'succeeded',
+                    lastMergeSourceCommit: { commitId: 'abc123' },
+                }),
+                waitForMergeStatusEvaluation: async () => null,
+                resolveConflicts: async () => ({ resolved: true }),
+                completePr: async () => {
+                    attempts++;
+                    throw Object.assign(new Error('Conflict'), { status: 409 });
+                },
+            });
+
+            expect(result).toBe(false);
+            expect(attempts).toBe(3); // Exactly 3 attempts
+        });
+
+        it('should fail after exactly 3 retries with 400 errors', async () => {
+            let attempts = 0;
+
+            const result = await completePrWithConflictResolution(100, {
+                getPrDetails: async () => ({
+                    mergeStatus: 'succeeded',
+                    lastMergeSourceCommit: { commitId: 'abc123' },
+                }),
+                waitForMergeStatusEvaluation: async () => null,
+                resolveConflicts: async () => ({ resolved: true }),
+                completePr: async () => {
+                    attempts++;
+                    throw Object.assign(new Error('Bad Request'), { status: 400 });
+                },
+            });
+
+            expect(result).toBe(false);
+            expect(attempts).toBe(3); // Exactly 3 attempts
+        });
+    });
+
+    describe('Status Transitions During Polling', () => {
+        it('should handle status transition from notSet to succeeded during evaluation wait', async () => {
+            let waitCalls = 0;
+
+            const result = await completePrWithConflictResolution(100, {
+                getPrDetails: async () => ({
+                    mergeStatus: 'notSet',
+                    lastMergeSourceCommit: undefined,
+                }),
+                waitForMergeStatusEvaluation: async () => {
+                    waitCalls++;
+                    // Simulates ADO finishing evaluation
+                    return {
+                        mergeStatus: 'succeeded',
+                        lastMergeSourceCommit: { commitId: 'evaluated-commit' },
+                    };
+                },
+                resolveConflicts: async () => {
+                    resolveConflictsCalls++;
+                    return { resolved: true };
+                },
+                completePr: async (commitId, options) => {
+                    completePrCalls.push({ commitId, options });
+                },
+            });
+
+            expect(result).toBe(true);
+            expect(waitCalls).toBe(1);
+            expect(resolveConflictsCalls).toBe(0); // Should NOT resolve
+            expect(completePrCalls[0].commitId).toBe('evaluated-commit');
+        });
+
+        it('should handle status transition from notSet to conflicts during evaluation wait', async () => {
+            let waitCalls = 0;
+
+            const result = await completePrWithConflictResolution(100, {
+                getPrDetails: async () => ({
+                    mergeStatus: 'notSet',
+                    lastMergeSourceCommit: undefined,
+                }),
+                waitForMergeStatusEvaluation: async () => {
+                    waitCalls++;
+                    if (waitCalls === 1) {
+                        // First wait: evaluation reveals conflicts
+                        return {
+                            mergeStatus: 'conflicts',
+                            lastMergeSourceCommit: { commitId: 'conflict-commit' },
+                        };
+                    }
+                    // After resolution
+                    return {
+                        mergeStatus: 'succeeded',
+                        lastMergeSourceCommit: { commitId: 'resolved-commit' },
+                    };
+                },
+                resolveConflicts: async () => {
+                    resolveConflictsCalls++;
+                    return { resolved: true };
+                },
+                completePr: async (commitId, options) => {
+                    completePrCalls.push({ commitId, options });
+                },
+            });
+
+            expect(result).toBe(true);
+            expect(resolveConflictsCalls).toBe(1); // Should resolve
+        });
+    });
+
+    describe('Resolution Success but Re-evaluation Timeout', () => {
+        it('should continue with completion even when post-resolution evaluation times out', async () => {
+            const result = await completePrWithConflictResolution(100, {
+                getPrDetails: async () => ({
+                    mergeStatus: 'conflicts',
+                    lastMergeSourceCommit: { commitId: 'original-commit' },
+                }),
+                waitForMergeStatusEvaluation: async () => {
+                    // Always timeout (return null)
+                    return null;
+                },
+                resolveConflicts: async () => {
+                    resolveConflictsCalls++;
+                    return { resolved: true };
+                },
+                completePr: async (commitId, options) => {
+                    completePrCalls.push({ commitId, options });
+                },
+            });
+
+            expect(result).toBe(true);
+            expect(resolveConflictsCalls).toBe(1);
+            // Should use the original commit since evaluation timed out
+            expect(completePrCalls[0].commitId).toBe('original-commit');
+        });
+    });
+
+    describe('Error Handling Edge Cases', () => {
+        it('should handle errors without status property', async () => {
+            const result = await completePrWithConflictResolution(100, {
+                getPrDetails: async () => ({
+                    mergeStatus: 'succeeded',
+                    lastMergeSourceCommit: { commitId: 'abc123' },
+                }),
+                waitForMergeStatusEvaluation: async () => null,
+                resolveConflicts: async () => ({ resolved: true }),
+                completePr: async () => {
+                    throw new Error('Network error'); // No status property
+                },
+            });
+
+            expect(result).toBe(false); // Should fail without retry
+        });
+
+        it('should handle resolution throwing an error', async () => {
+            const result = await completePrWithConflictResolution(100, {
+                getPrDetails: async () => ({
+                    mergeStatus: 'conflicts',
+                    lastMergeSourceCommit: { commitId: 'abc123' },
+                }),
+                waitForMergeStatusEvaluation: async () => null,
+                resolveConflicts: async () => {
+                    throw new Error('Git clone failed');
+                },
+                completePr: async () => {},
+            });
+
+            // The function should handle the error gracefully
+            expect(result).toBe(false);
+        });
+
+        it('should handle getPrDetails throwing an error', async () => {
+            const result = await completePrWithConflictResolution(100, {
+                getPrDetails: async () => {
+                    throw new Error('API unavailable');
+                },
+                waitForMergeStatusEvaluation: async () => null,
+                resolveConflicts: async () => ({ resolved: true }),
+                completePr: async () => {},
+            });
+
+            expect(result).toBe(false);
+        });
+    });
+
+    describe('Commit ID Edge Cases', () => {
+        it('should handle commitId being null', async () => {
+            let callCount = 0;
+
+            const result = await completePrWithConflictResolution(100, {
+                getPrDetails: async () => {
+                    callCount++;
+                    if (callCount < 3) {
+                        return {
+                            mergeStatus: 'succeeded',
+                            lastMergeSourceCommit: { commitId: null as unknown as string },
+                        };
+                    }
+                    return {
+                        mergeStatus: 'succeeded',
+                        lastMergeSourceCommit: { commitId: 'finally-valid' },
+                    };
+                },
+                waitForMergeStatusEvaluation: async () => null,
+                resolveConflicts: async () => ({ resolved: true }),
+                completePr: async (commitId, options) => {
+                    completePrCalls.push({ commitId, options });
+                },
+            });
+
+            expect(result).toBe(true);
+            expect(completePrCalls[0].commitId).toBe('finally-valid');
+        });
+
+        it('should handle commitId being empty string', async () => {
+            let callCount = 0;
+
+            const result = await completePrWithConflictResolution(100, {
+                getPrDetails: async () => {
+                    callCount++;
+                    if (callCount < 3) {
+                        return {
+                            mergeStatus: 'succeeded',
+                            lastMergeSourceCommit: { commitId: '' },
+                        };
+                    }
+                    return {
+                        mergeStatus: 'succeeded',
+                        lastMergeSourceCommit: { commitId: 'valid-commit' },
+                    };
+                },
+                waitForMergeStatusEvaluation: async () => null,
+                resolveConflicts: async () => ({ resolved: true }),
+                completePr: async (commitId, options) => {
+                    completePrCalls.push({ commitId, options });
+                },
+            });
+
+            // Note: empty string is falsy so should trigger retry
+            expect(result).toBe(true);
+            expect(completePrCalls[0].commitId).toBe('valid-commit');
+        });
+    });
+
+    describe('First Attempt vs Subsequent Attempts', () => {
+        it('should only wait for evaluation on first attempt', async () => {
+            let waitCalls = 0;
+            let attempt = 0;
+
+            const result = await completePrWithConflictResolution(100, {
+                getPrDetails: async () => {
+                    attempt++;
+                    return {
+                        mergeStatus: 'notSet',
+                        lastMergeSourceCommit: { commitId: 'abc123' },
+                    };
+                },
+                waitForMergeStatusEvaluation: async () => {
+                    waitCalls++;
+                    return {
+                        mergeStatus: 'succeeded',
+                        lastMergeSourceCommit: { commitId: 'abc123' },
+                    };
+                },
+                resolveConflicts: async () => ({ resolved: true }),
+                completePr: async (commitId, options) => {
+                    if (attempt === 1) {
+                        throw Object.assign(new Error('Retry'), { status: 409 });
+                    }
+                    completePrCalls.push({ commitId, options });
+                },
+            });
+
+            expect(result).toBe(true);
+            // Should only call waitForMergeStatusEvaluation once (on first attempt)
+            expect(waitCalls).toBe(1);
+        });
+    });
+
+    describe('Mixed Retry Scenarios', () => {
+        it('should handle alternating 409 and 400 errors before success', async () => {
+            let attempts = 0;
+
+            const result = await completePrWithConflictResolution(100, {
+                getPrDetails: async () => ({
+                    mergeStatus: 'succeeded',
+                    lastMergeSourceCommit: { commitId: 'abc123' },
+                }),
+                waitForMergeStatusEvaluation: async () => null,
+                resolveConflicts: async () => ({ resolved: true }),
+                completePr: async (commitId, options) => {
+                    attempts++;
+                    if (attempts === 1) {
+                        throw Object.assign(new Error('Conflict'), { status: 409 });
+                    }
+                    if (attempts === 2) {
+                        throw Object.assign(new Error('Bad Request'), { status: 400 });
+                    }
+                    completePrCalls.push({ commitId, options });
+                },
+            });
+
+            expect(result).toBe(true);
+            expect(attempts).toBe(3);
+        });
+    });
+});
