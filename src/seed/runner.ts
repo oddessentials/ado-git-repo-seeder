@@ -693,22 +693,25 @@ export class SeedRunner {
                         targetBranch
                     );
 
-                    conflictResolutionAttempted = true;
-
                     if (!resolution.resolved) {
                         console.log(`   ❌ Conflict resolution failed for PR #${prId}: ${resolution.error}`);
+                        // Don't set conflictResolutionAttempted - allow retry on next attempt
+                        // This handles transient failures (network errors, etc.)
                         // Continue to try completion anyway - bypassPolicy might help
                     } else {
                         console.log(`   ✅ Conflicts resolved for PR #${prId}`);
-                    }
+                        // Only mark as attempted when resolution actually succeeded
+                        // This prevents unnecessary re-resolution while allowing retry after transient failures
+                        conflictResolutionAttempted = true;
 
-                    // Wait for ADO to re-evaluate merge status after our push
-                    const refreshed = await this.waitForMergeStatusEvaluation(project, repoId, prId, 15000);
-                    if (refreshed) {
-                        prDetails = refreshed;
-                    } else {
-                        // Timeout - get latest details and continue
-                        prDetails = await this.prManager.getPrDetails(project, repoId, prId);
+                        // Wait for ADO to re-evaluate merge status after our push
+                        const refreshed = await this.waitForMergeStatusEvaluation(project, repoId, prId, 15000);
+                        if (refreshed) {
+                            prDetails = refreshed;
+                        } else {
+                            // Timeout - get latest details and continue
+                            prDetails = await this.prManager.getPrDetails(project, repoId, prId);
+                        }
                     }
                 }
 

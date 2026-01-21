@@ -526,12 +526,14 @@ describe('bypassPolicy configuration', () => {
 
 describe('CRITICAL REGRESSION: conflictResolutionAttempted flag', () => {
     /**
-     * REGRESSION TEST: After attempting conflict resolution once, we should NOT
-     * attempt it again on retry. This prevents infinite loops of:
-     * resolve -> push -> ADO re-evaluates as conflicts -> resolve again
+     * REGRESSION TEST: The conflictResolutionAttempted flag controls when we retry resolution.
+     *
+     * Key behaviors:
+     * 1. After SUCCESSFUL resolution, don't resolve again (prevents infinite loops)
+     * 2. After FAILED resolution, allow retry on next attempt (handles transient failures)
      */
 
-    it('should only attempt resolution once per PR completion attempt', () => {
+    it('should NOT attempt resolution again after SUCCESSFUL resolution', () => {
         let conflictResolutionAttempted = false;
         const mergeStatus = 'conflicts';
 
@@ -539,12 +541,94 @@ describe('CRITICAL REGRESSION: conflictResolutionAttempted flag', () => {
         const needsFirstResolution = mergeStatus === 'conflicts' && !conflictResolutionAttempted;
         expect(needsFirstResolution).toBe(true);
 
-        // After resolution attempt
-        conflictResolutionAttempted = true;
+        // Simulate SUCCESSFUL resolution - set the flag
+        const resolutionSucceeded = true;
+        if (resolutionSucceeded) {
+            conflictResolutionAttempted = true;
+        }
 
-        // Second check: should NOT resolve again
+        // Second check: should NOT resolve again after success
         const needsSecondResolution = mergeStatus === 'conflicts' && !conflictResolutionAttempted;
         expect(needsSecondResolution).toBe(false);
+    });
+
+    it('REGRESSION: should allow retry after FAILED resolution (transient failure)', () => {
+        /**
+         * BUG FIX: Previously, conflictResolutionAttempted was set unconditionally
+         * after calling resolveConflicts(), even if it returned resolved: false.
+         * This meant transient failures (network errors, git push failures) would
+         * permanently disable resolution for all retry attempts.
+         *
+         * CORRECT BEHAVIOR: Only set the flag when resolution.resolved === true
+         */
+        let conflictResolutionAttempted = false;
+        const mergeStatus = 'conflicts';
+
+        // First attempt: resolution FAILS (transient error)
+        const needsFirstResolution = mergeStatus === 'conflicts' && !conflictResolutionAttempted;
+        expect(needsFirstResolution).toBe(true);
+
+        // Simulate FAILED resolution - do NOT set the flag
+        const resolutionSucceeded = false;
+        if (resolutionSucceeded) {
+            conflictResolutionAttempted = true;
+        }
+        // Flag should still be false after failed resolution
+        expect(conflictResolutionAttempted).toBe(false);
+
+        // Second attempt (retry): should STILL try resolution because previous attempt failed
+        const needsSecondResolution = mergeStatus === 'conflicts' && !conflictResolutionAttempted;
+        expect(needsSecondResolution).toBe(true); // This is the key assertion!
+
+        // Now simulate SUCCESSFUL resolution on retry
+        const retrySucceeded = true;
+        if (retrySucceeded) {
+            conflictResolutionAttempted = true;
+        }
+
+        // Third attempt: should NOT resolve again after success
+        const needsThirdResolution = mergeStatus === 'conflicts' && !conflictResolutionAttempted;
+        expect(needsThirdResolution).toBe(false);
+    });
+
+    it('simulates the full retry flow with transient failure then success', () => {
+        /**
+         * Scenario:
+         * - Attempt 1: conflicts detected, resolveConflicts() fails (network error), completion fails
+         * - Attempt 2: conflicts still detected, resolveConflicts() succeeds, completion succeeds
+         */
+        let conflictResolutionAttempted = false;
+        const mergeStatus = 'conflicts';
+        const maxRetries = 3;
+
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            const needsResolution = mergeStatus === 'conflicts' && !conflictResolutionAttempted;
+
+            if (attempt === 0) {
+                // First attempt: needs resolution
+                expect(needsResolution).toBe(true);
+
+                // Resolution fails (transient error)
+                const resolved = false;
+                if (resolved) {
+                    conflictResolutionAttempted = true;
+                }
+                // Completion would fail, trigger retry
+            } else if (attempt === 1) {
+                // Second attempt: should STILL need resolution (previous failed)
+                expect(needsResolution).toBe(true);
+
+                // Resolution succeeds this time
+                const resolved = true;
+                if (resolved) {
+                    conflictResolutionAttempted = true;
+                }
+                // Completion would succeed, break
+                break;
+            }
+        }
+
+        expect(conflictResolutionAttempted).toBe(true);
     });
 });
 
