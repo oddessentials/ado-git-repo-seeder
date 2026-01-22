@@ -165,7 +165,14 @@ export class SeedRunner {
         openPrsAfter?: number;
         completionTarget?: number;
     }> {
-        const stats = {
+        const stats: {
+            draftsPublished: number;
+            prsCompleted: number;
+            prsFailed: number;
+            completionTarget?: number;
+            openPrsBefore?: number;
+            openPrsAfter?: number;
+        } = {
             draftsPublished: 0,
             prsCompleted: 0,
             prsFailed: 0,
