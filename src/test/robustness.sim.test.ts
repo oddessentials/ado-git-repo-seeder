@@ -58,6 +58,7 @@ describe('Multi-Run Robustness (Simulated)', () => {
                             pullRequestId: 101,
                             lastMergeSourceCommit: { commitId: 'abc' },
                             mergeStatus: 'succeeded',
+                            status: 'completed',
                         },
                     });
                 // Check for PR list (no trailing ID)

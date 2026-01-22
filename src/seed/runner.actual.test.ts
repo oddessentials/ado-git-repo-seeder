@@ -108,6 +108,7 @@ describe('SeedRunner Actual Code Coverage', () => {
                         data: {
                             pullRequestId: 101,
                             mergeStatus: mergeStatus,
+                            status: 'completed',
                             lastMergeSourceCommit: commitId ? { commitId } : undefined,
                         },
                     });
@@ -269,6 +270,7 @@ describe('SeedRunner Actual Code Coverage', () => {
                         data: {
                             pullRequestId: 101,
                             mergeStatus: status,
+                            status: 'completed',
                             lastMergeSourceCommit: { commitId: 'abc123' },
                         },
                     });
@@ -331,6 +333,7 @@ describe('SeedRunner Actual Code Coverage', () => {
                         data: {
                             pullRequestId: 101,
                             mergeStatus: status,
+                            status: 'completed',
                             lastMergeSourceCommit: { commitId: 'abc123' },
                         },
                     });
@@ -432,6 +435,7 @@ describe('SeedRunner Actual Code Coverage', () => {
                         data: {
                             pullRequestId: 100,
                             mergeStatus: 'succeeded',
+                            status: 'completed',
                             lastMergeSourceCommit: { commitId: 'abc' },
                         },
                     });
