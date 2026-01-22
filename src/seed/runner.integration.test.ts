@@ -55,10 +55,11 @@ async function completePrWithConflictResolution(prId: number, deps: MockDependen
 
             const mergeStatus = prDetails.mergeStatus;
 
-            // Step 2: ONLY resolve conflicts when explicitly reported as 'conflicts'
-            // Do NOT resolve for: notSet, queued, undefined, failure, succeeded
+            // Step 2: ONLY resolve conflicts when explicitly reported as 'conflicts' or 'failure'
+            // Do NOT resolve for: notSet, queued, undefined, succeeded
             // This prevents unnecessary force-pushes that break the completion flow
-            const needsResolution = mergeStatus === 'conflicts' && !conflictResolutionAttempted;
+            const needsResolution =
+                (mergeStatus === 'conflicts' || mergeStatus === 'failure') && !conflictResolutionAttempted;
 
             if (needsResolution) {
                 // Resolve conflicts by merging target into source with -X ours
@@ -240,7 +241,7 @@ describe('SeedRunner Integration: completePrWithConflictResolution', () => {
             expect(resolveConflictsCalls).toBe(0);
         });
 
-        it('REGRESSION: should NOT trigger resolution when mergeStatus is "failure"', async () => {
+        it('should trigger resolution when mergeStatus is "failure"', async () => {
             const result = await completePrWithConflictResolution(100, {
                 getPrDetails: async () => ({
                     mergeStatus: 'failure',
@@ -257,7 +258,7 @@ describe('SeedRunner Integration: completePrWithConflictResolution', () => {
             });
 
             expect(result).toBe(true);
-            expect(resolveConflictsCalls).toBe(0);
+            expect(resolveConflictsCalls).toBe(1);
         });
     });
 
@@ -568,7 +569,7 @@ describe('Comprehensive Merge Status Matrix', () => {
     const statusMatrix = [
         { status: 'conflicts' as const, shouldResolve: true, reason: 'Actual conflicts need resolution' },
         { status: 'succeeded' as const, shouldResolve: false, reason: 'Ready to merge, no conflicts' },
-        { status: 'failure' as const, shouldResolve: false, reason: 'Resolution cannot fix non-conflict failures' },
+        { status: 'failure' as const, shouldResolve: true, reason: 'Attempt resolution to unblock failure status' },
         { status: 'notSet' as const, shouldResolve: false, reason: 'ADO still evaluating, wait instead' },
         { status: 'queued' as const, shouldResolve: false, reason: 'Evaluation queued, wait instead' },
         { status: undefined, shouldResolve: false, reason: 'Status unknown, do not force-push' },
@@ -577,7 +578,7 @@ describe('Comprehensive Merge Status Matrix', () => {
     statusMatrix.forEach(({ status, shouldResolve, reason }) => {
         it(`mergeStatus="${status ?? 'undefined'}" -> needsResolution=${shouldResolve} (${reason})`, () => {
             // This is the EXACT logic from runner.ts
-            const needsResolution = status === 'conflicts';
+            const needsResolution = status === 'conflicts' || status === 'failure';
             expect(needsResolution).toBe(shouldResolve);
         });
     });
@@ -614,7 +615,8 @@ describe('conflictResolutionAttempted Flag Behavior', () => {
         const conflictResolutionAttempted = true;
         const mergeStatus = 'conflicts';
 
-        const needsResolution = mergeStatus === 'conflicts' && !conflictResolutionAttempted;
+        const needsResolution =
+            (mergeStatus === 'conflicts' || mergeStatus === 'failure') && !conflictResolutionAttempted;
 
         expect(needsResolution).toBe(false);
     });
