@@ -4,7 +4,7 @@
  * Tests the completePrWithConflictResolution helper method behavior.
  *
  * CRITICAL REGRESSION TESTS:
- * - needsResolution must ONLY return true for 'conflicts' status
+ * - needsResolution must return true for 'conflicts' or 'failure' status
  * - Non-terminal statuses (notSet, queued, undefined) must NOT trigger conflict resolution
  * - Missing commitId must trigger retry, not pass empty string
  */
@@ -14,14 +14,14 @@ import { describe, it, expect, vi } from 'vitest';
  * Helper to determine if resolution is needed based on merge status.
  * This mirrors the CORRECT logic in completePrWithConflictResolution.
  *
- * IMPORTANT: Only 'conflicts' status should trigger resolution.
- * Other statuses (notSet, queued, undefined, failure) should NOT trigger
- * resolution as they would cause unnecessary force-pushes that invalidate
- * ADO's merge evaluation and break the completion flow.
+ * IMPORTANT: Only 'conflicts' or 'failure' status should trigger resolution.
+ * Other statuses (notSet, queued, undefined) should NOT trigger resolution
+ * as they would cause unnecessary force-pushes that invalidate ADO's merge
+ * evaluation and break the completion flow.
  */
 function needsResolution(mergeStatus: string | undefined): boolean {
-    // ONLY resolve when ADO explicitly reports conflicts
-    return mergeStatus === 'conflicts';
+    // ONLY resolve when ADO explicitly reports conflicts or failure
+    return mergeStatus === 'conflicts' || mergeStatus === 'failure';
 }
 
 /**
@@ -108,12 +108,12 @@ describe('PR Conflict Resolution', () => {
             const flow = [
                 'getPrDetails',
                 'optional: waitForMergeStatusEvaluation (if first attempt and pending)',
-                'check needsResolution (ONLY for conflicts)',
+                'check needsResolution (ONLY for conflicts/failure)',
                 'if needsResolution: resolveConflicts',
                 'completePr (bypassPolicy: true)',
             ];
 
-            expect(flow).toContain('check needsResolution (ONLY for conflicts)');
+            expect(flow).toContain('check needsResolution (ONLY for conflicts/failure)');
         });
 
         it('flow without conflicts skips resolution', () => {
@@ -141,7 +141,7 @@ describe('CRITICAL REGRESSION: needsResolution logic', () => {
      * 3. Failed completion attempts
      * 4. Stuck cleanup mode that never made progress
      *
-     * The CORRECT behavior: Only resolve when mergeStatus === 'conflicts'
+     * The CORRECT behavior: Resolve when mergeStatus === 'conflicts' or 'failure'
      */
 
     describe('ONLY conflicts status should require resolution', () => {
@@ -150,11 +150,10 @@ describe('CRITICAL REGRESSION: needsResolution logic', () => {
         });
     });
 
-    describe('NON-CONFLICT statuses must NOT require resolution', () => {
-        it('REGRESSION: failure status must NOT require resolution', () => {
-            // failure means the merge couldn't be completed for other reasons
-            // Trying to resolve conflicts won't help - just try completion with bypass
-            expect(needsResolution('failure')).toBe(false);
+    describe('NON-CONFLICT statuses (excluding failure) must NOT require resolution', () => {
+        it('failure status should require resolution attempt', () => {
+            // failure means merge evaluation failed, attempt resolution to unblock
+            expect(needsResolution('failure')).toBe(true);
         });
 
         it('REGRESSION: undefined status must NOT require resolution', () => {
@@ -184,7 +183,7 @@ describe('CRITICAL REGRESSION: needsResolution logic', () => {
         const testCases = [
             { status: 'conflicts', shouldResolve: true, reason: 'actual conflicts exist' },
             { status: 'succeeded', shouldResolve: false, reason: 'merge is ready' },
-            { status: 'failure', shouldResolve: false, reason: 'conflicts wont help failure' },
+            { status: 'failure', shouldResolve: true, reason: 'attempt resolution to unblock failures' },
             { status: 'notSet', shouldResolve: false, reason: 'ADO still evaluating' },
             { status: 'queued', shouldResolve: false, reason: 'ADO evaluation queued' },
             { status: undefined, shouldResolve: false, reason: 'status not yet available' },
@@ -443,7 +442,7 @@ describe('post-resolution verification', () => {
         // But should NOT attempt resolution again (conflictResolutionAttempted flag)
     });
 
-    it('REGRESSION: failure status should NOT trigger resolution', async () => {
+    it('REGRESSION: failure status SHOULD trigger resolution', async () => {
         // Simulates: notSet -> evaluation -> failure
         let callCount = 0;
         const mockGetPrDetails = vi.fn().mockImplementation(async () => {
@@ -460,9 +459,8 @@ describe('post-resolution verification', () => {
         const evaluated = await mockGetPrDetails();
         expect(evaluated.mergeStatus).toBe('failure');
 
-        // CRITICAL: failure should NOT trigger resolution
-        // The old bug would resolve here, which doesn't help failure status
-        expect(needsResolution(evaluated.mergeStatus)).toBe(false);
+        // CRITICAL: failure should trigger resolution to attempt unblocking
+        expect(needsResolution(evaluated.mergeStatus)).toBe(true);
     });
 });
 

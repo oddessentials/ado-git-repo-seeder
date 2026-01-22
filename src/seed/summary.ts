@@ -42,6 +42,9 @@ export interface SeedSummary {
         draftsPublished: number;
         prsCompleted: number;
         prsFailed: number;
+        openPrsBefore?: number;
+        openPrsAfter?: number;
+        completionTarget?: number;
     };
 }
 
@@ -84,6 +87,15 @@ export function generateMarkdownSummary(summary: SeedSummary): string {
         lines.push(`- **PRs Completed:** ${summary.cleanupStats.prsCompleted}`);
         lines.push(`- **Drafts Published:** ${summary.cleanupStats.draftsPublished}`);
         lines.push(`- **PRs Failed:** ${summary.cleanupStats.prsFailed}`);
+        if (summary.cleanupStats.completionTarget !== undefined) {
+            lines.push(`- **Completion Target:** ${summary.cleanupStats.completionTarget}`);
+        }
+        if (summary.cleanupStats.openPrsBefore !== undefined) {
+            lines.push(`- **Open PRs Before:** ${summary.cleanupStats.openPrsBefore}`);
+        }
+        if (summary.cleanupStats.openPrsAfter !== undefined) {
+            lines.push(`- **Open PRs After:** ${summary.cleanupStats.openPrsAfter}`);
+        }
         lines.push('');
         return lines.join('\n');
     }
