@@ -240,12 +240,22 @@ export class GitGenerator {
             await this.git(repoPath, ['config', 'user.email', 'seeder@example.com']);
             await this.git(repoPath, ['config', 'user.name', 'ADO Seeder']);
 
-            // Fetch the source branch
-            await this.git(repoPath, ['fetch', 'origin', sourceBranch], true, env);
+            // Fetch the source branch and create a tracking ref
+            await this.git(
+                repoPath,
+                ['fetch', 'origin', `${sourceBranch}:refs/remotes/origin/${sourceBranch}`],
+                true,
+                env
+            );
             await this.git(repoPath, ['checkout', '-b', sourceBranch, `origin/${sourceBranch}`]);
 
-            // Fetch target branch
-            await this.git(repoPath, ['fetch', 'origin', targetBranch], true, env);
+            // Fetch target branch and create a tracking ref
+            await this.git(
+                repoPath,
+                ['fetch', 'origin', `${targetBranch}:refs/remotes/origin/${targetBranch}`],
+                true,
+                env
+            );
 
             // Merge target into source with auto-resolution favoring source changes
             // -X ours means "on conflict, take our (source) version"

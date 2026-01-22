@@ -161,8 +161,23 @@ export class SeedRunner {
         draftsPublished: number;
         prsCompleted: number;
         prsFailed: number;
+        openPrsBefore?: number;
+        openPrsAfter?: number;
+        completionTarget?: number;
     }> {
-        const stats = { draftsPublished: 0, prsCompleted: 0, prsFailed: 0 };
+        const stats: {
+            draftsPublished: number;
+            prsCompleted: number;
+            prsFailed: number;
+            completionTarget?: number;
+            openPrsBefore?: number;
+            openPrsAfter?: number;
+        } = {
+            draftsPublished: 0,
+            prsCompleted: 0,
+            prsFailed: 0,
+            completionTarget: targetCount,
+        };
 
         // Collect all open PRs with project/repo context
         interface OpenPrInfo {
@@ -203,13 +218,16 @@ export class SeedRunner {
         // Sort by creation date (oldest first)
         allOpenPrs.sort((a, b) => a.createdDate.getTime() - b.createdDate.getTime());
 
+        stats.openPrsBefore = allOpenPrs.length;
         console.log(`   Found ${allOpenPrs.length} open PRs, targeting ${targetCount} for completion\n`);
 
         // Process oldest PRs first
         const primaryUser = this.config.resolvedUsers[0];
 
-        for (let i = 0; i < Math.min(targetCount, allOpenPrs.length); i++) {
-            const { project, repoId, repoName, remoteUrl, pr } = allOpenPrs[i];
+        for (const { project, repoId, remoteUrl, pr } of allOpenPrs) {
+            if (stats.prsCompleted >= targetCount) {
+                break;
+            }
             const prTitle = pr.title.length > 50 ? pr.title.slice(0, 47) + '...' : pr.title;
 
             try {
@@ -251,6 +269,7 @@ export class SeedRunner {
             }
         }
 
+        stats.openPrsAfter = await this.countOpenPrs();
         console.log(
             `\n   📊 Cleanup summary: ${stats.prsCompleted} completed, ${stats.draftsPublished} drafts published, ${stats.prsFailed} failed`
         );
@@ -632,6 +651,66 @@ export class SeedRunner {
     }
 
     /**
+     * Waits for ADO to report mergeStatus as 'succeeded' after updates.
+     *
+     * @returns PR details with mergeStatus 'succeeded', or null if timeout
+     */
+    private async waitForMergeStatusSuccess(
+        project: string,
+        repoId: string,
+        prId: number,
+        maxWaitMs: number = 60000
+    ): Promise<Awaited<ReturnType<PrManager['getPrDetails']>> | null> {
+        const pollIntervalMs = 2000;
+        const startTime = Date.now();
+        let lastStatus: string | undefined;
+
+        while (Date.now() - startTime < maxWaitMs) {
+            const prDetails = await this.prManager.getPrDetails(project, repoId, prId);
+            lastStatus = prDetails.mergeStatus;
+
+            if (lastStatus === 'succeeded') {
+                return prDetails;
+            }
+
+            console.log(`   ⏳ PR #${prId} merge status is '${lastStatus ?? 'undefined'}', waiting for success...`);
+            await new Promise((r) => setTimeout(r, pollIntervalMs));
+        }
+
+        console.log(
+            `   ⚠️  PR #${prId} merge status did not reach 'succeeded' after ${maxWaitMs}ms (last=${lastStatus ?? 'undefined'})`
+        );
+        return null;
+    }
+
+    /**
+     * Waits for ADO to mark the PR as completed after a completion request.
+     *
+     * @returns true when status is 'completed', false on timeout
+     */
+    private async waitForCompletion(
+        project: string,
+        repoId: string,
+        prId: number,
+        maxWaitMs: number = 15000
+    ): Promise<boolean> {
+        const pollIntervalMs = 2000;
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < maxWaitMs) {
+            const prDetails = await this.prManager.getPrDetails(project, repoId, prId);
+            if (prDetails.status === 'completed') {
+                return true;
+            }
+            console.log(`   ⏳ PR #${prId} status is '${prDetails.status}', waiting for completion...`);
+            await new Promise((r) => setTimeout(r, pollIntervalMs));
+        }
+
+        console.log(`   ⚠️  PR #${prId} completion verification timed out after ${maxWaitMs}ms`);
+        return false;
+    }
+
+    /**
      * Attempts to complete a PR with automatic conflict resolution.
      *
      * IMPORTANT: Only resolves conflicts when mergeStatus is explicitly 'conflicts'.
@@ -641,7 +720,7 @@ export class SeedRunner {
      *
      * Flow:
      * 1. Get PR details (with short wait for evaluation if needed)
-     * 2. If mergeStatus is 'conflicts', resolve by merging target into source
+     * 2. If mergeStatus is 'conflicts' or 'failure', resolve by merging target into source
      * 3. Try completion with bypassPolicy enabled
      * 4. On failure, retry with backoff
      *
@@ -677,13 +756,15 @@ export class SeedRunner {
 
                 const mergeStatus = prDetails.mergeStatus;
 
-                // Step 2: ONLY resolve conflicts when explicitly reported as 'conflicts'
-                // Do NOT resolve for: notSet, queued, undefined, failure, succeeded
+                // Step 2: ONLY resolve conflicts when explicitly reported as 'conflicts' or 'failure'
+                // Do NOT resolve for: notSet, queued, undefined, succeeded
                 // This prevents unnecessary force-pushes that break the completion flow
-                const needsResolution = mergeStatus === 'conflicts' && !conflictResolutionAttempted;
+                const needsResolution =
+                    (mergeStatus === 'conflicts' || mergeStatus === 'failure') && !conflictResolutionAttempted;
 
                 if (needsResolution) {
-                    console.log(`   ⚠️  PR #${prId} has merge conflicts, auto-resolving...`);
+                    const statusLabel = mergeStatus ?? 'unknown';
+                    console.log(`   ⚠️  PR #${prId} merge status is '${statusLabel}', auto-resolving...`);
 
                     // Resolve conflicts by merging target into source with -X ours
                     const resolution = await this.gitGenerator.resolveConflicts(
@@ -715,6 +796,14 @@ export class SeedRunner {
                     }
                 }
 
+                if (prDetails.mergeStatus !== 'succeeded') {
+                    const successDetails = await this.waitForMergeStatusSuccess(project, repoId, prId, 60000);
+                    if (!successDetails) {
+                        return false;
+                    }
+                    prDetails = successDetails;
+                }
+
                 // Step 3: Complete the PR
                 const commitId = prDetails.lastMergeSourceCommit?.commitId;
                 if (!commitId) {
@@ -729,6 +818,12 @@ export class SeedRunner {
                 await this.prManager.completePr(project, repoId, prId, commitId, {
                     bypassPolicy: true,
                 });
+
+                const completionVerified = await this.waitForCompletion(project, repoId, prId, 15000);
+                if (!completionVerified) {
+                    console.log(`   ❌ PR #${prId} completion not verified after merge request`);
+                    return false;
+                }
 
                 return true;
             } catch (error: any) {

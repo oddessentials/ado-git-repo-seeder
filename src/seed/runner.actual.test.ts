@@ -64,6 +64,7 @@ describe('SeedRunner Actual Code Coverage', () => {
     function setupAxiosMock(
         options: {
             mergeStatus?: string;
+            mergeStatusSequence?: string[];
             commitId?: string;
             hasPrs?: boolean;
             prCount?: number;
@@ -73,6 +74,7 @@ describe('SeedRunner Actual Code Coverage', () => {
     ) {
         const {
             mergeStatus = 'succeeded',
+            mergeStatusSequence,
             commitId = 'abc123',
             hasPrs = true,
             prCount = 60, // Above threshold to trigger cleanup
@@ -81,6 +83,8 @@ describe('SeedRunner Actual Code Coverage', () => {
         } = options;
 
         let completePrAttempts = 0;
+        let prDetailsCalls = 0;
+        const statusSequence = mergeStatusSequence ?? [mergeStatus];
 
         mockAxiosInstance = {
             interceptors: {
@@ -104,10 +108,13 @@ describe('SeedRunner Actual Code Coverage', () => {
 
                 // Specific PR by ID (must come before PR list check)
                 if (lowUrl.includes('pullrequests/')) {
+                    const status = statusSequence[Math.min(prDetailsCalls, statusSequence.length - 1)] ?? mergeStatus;
+                    prDetailsCalls += 1;
                     return Promise.resolve({
                         data: {
                             pullRequestId: 101,
-                            mergeStatus: mergeStatus,
+                            mergeStatus: status,
+                            status: 'completed',
                             lastMergeSourceCommit: commitId ? { commitId } : undefined,
                         },
                     });
@@ -189,7 +196,7 @@ describe('SeedRunner Actual Code Coverage', () => {
         });
 
         it('exercises PR completion with conflicts - triggers resolution', async () => {
-            setupAxiosMock({ mergeStatus: 'conflicts', prCount: 60 });
+            setupAxiosMock({ mergeStatusSequence: ['conflicts', 'succeeded'], prCount: 60 });
 
             const config = loadConfig(configPath, 'test-run');
             const plan = createPlan(config);
@@ -269,6 +276,7 @@ describe('SeedRunner Actual Code Coverage', () => {
                         data: {
                             pullRequestId: 101,
                             mergeStatus: status,
+                            status: 'completed',
                             lastMergeSourceCommit: { commitId: 'abc123' },
                         },
                     });
@@ -331,6 +339,7 @@ describe('SeedRunner Actual Code Coverage', () => {
                         data: {
                             pullRequestId: 101,
                             mergeStatus: status,
+                            status: 'completed',
                             lastMergeSourceCommit: { commitId: 'abc123' },
                         },
                     });
@@ -397,7 +406,7 @@ describe('SeedRunner Actual Code Coverage', () => {
         });
 
         it('exercises conflict resolution during normal PR processing', async () => {
-            setupAxiosMock({ mergeStatus: 'conflicts', prCount: 0, hasPrs: false });
+            setupAxiosMock({ mergeStatusSequence: ['conflicts', 'succeeded'], prCount: 0, hasPrs: false });
 
             const config = loadConfig(configPath, 'test-run');
             const plan = createPlan(config);
@@ -432,6 +441,7 @@ describe('SeedRunner Actual Code Coverage', () => {
                         data: {
                             pullRequestId: 100,
                             mergeStatus: 'succeeded',
+                            status: 'completed',
                             lastMergeSourceCommit: { commitId: 'abc' },
                         },
                     });
@@ -495,7 +505,7 @@ describe('SeedRunner Actual Code Coverage', () => {
 
     describe('conflict resolution failure handling', () => {
         it('exercises failed resolution path', async () => {
-            setupAxiosMock({ mergeStatus: 'conflicts', prCount: 60 });
+            setupAxiosMock({ mergeStatusSequence: ['conflicts', 'succeeded'], prCount: 60 });
 
             // Make git clone fail to simulate resolution failure
             (exec as any).mockImplementation((cmd: string, args: string[]) => {

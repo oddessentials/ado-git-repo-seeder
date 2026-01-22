@@ -172,6 +172,9 @@ describe('summary', () => {
                         draftsPublished: 5,
                         prsCompleted: 213,
                         prsFailed: 2,
+                        completionTarget: 200,
+                        openPrsBefore: 400,
+                        openPrsAfter: 187,
                     },
                 };
 
@@ -181,6 +184,9 @@ describe('summary', () => {
                 expect(md).toContain('PRs Completed:** 213');
                 expect(md).toContain('Drafts Published:** 5');
                 expect(md).toContain('PRs Failed:** 2');
+                expect(md).toContain('Completion Target:** 200');
+                expect(md).toContain('Open PRs Before:** 400');
+                expect(md).toContain('Open PRs After:** 187');
             });
 
             it('does not show normal statistics in cleanup mode', () => {

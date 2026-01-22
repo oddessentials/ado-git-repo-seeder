@@ -65,7 +65,7 @@ describe('GitGenerator.resolveConflicts', () => {
 
             expect(exec).toHaveBeenCalledWith(
                 'git',
-                expect.arrayContaining(['fetch', 'origin', 'feature/my-branch']),
+                expect.arrayContaining(['fetch', 'origin', 'feature/my-branch:refs/remotes/origin/feature/my-branch']),
                 expect.any(Object)
             );
             expect(exec).toHaveBeenCalledWith(
@@ -85,7 +85,7 @@ describe('GitGenerator.resolveConflicts', () => {
 
             expect(exec).toHaveBeenCalledWith(
                 'git',
-                expect.arrayContaining(['fetch', 'origin', 'main']),
+                expect.arrayContaining(['fetch', 'origin', 'main:refs/remotes/origin/main']),
                 expect.any(Object)
             );
         });
@@ -136,7 +136,7 @@ describe('GitGenerator.resolveConflicts', () => {
 
             expect(exec).toHaveBeenCalledWith(
                 'git',
-                expect.arrayContaining(['fetch', 'origin', 'main']),
+                expect.arrayContaining(['fetch', 'origin', 'main:refs/remotes/origin/main']),
                 expect.any(Object)
             );
         });
@@ -325,7 +325,7 @@ describe('resolveConflicts integration scenarios', () => {
 
             expect(exec).toHaveBeenCalledWith(
                 'git',
-                expect.arrayContaining(['fetch', 'origin', 'develop']),
+                expect.arrayContaining(['fetch', 'origin', 'develop:refs/remotes/origin/develop']),
                 expect.any(Object)
             );
             expect(exec).toHaveBeenCalledWith(
