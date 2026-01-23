@@ -14,7 +14,7 @@ jobs:
     # Block fork PRs for security (self-hosted runners should not run untrusted code)
     if: github.event.pull_request.head.repo.full_name == github.repository
 
-    uses: oddessentials/odd-ai-reviewers/.github/workflows/ai-review.yml@feat/ollama-power-up
+    uses: oddessentials/odd-ai-reviewers/.github/workflows/ai-review.yml@main
     with:
       target_repo: ${{ github.repository }}
       target_ref: ${{ github.sha }}
@@ -23,7 +23,7 @@ jobs:
       runs_on: '["self-hosted", "linux"]'
       # runs_on: '["ubuntu-latest"]' if default and not needed but here to be explicit
 
-    #secrets:
+    # secrets:
       # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       # Optional w/ OSCR:
