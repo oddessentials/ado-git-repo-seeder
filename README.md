@@ -1,7 +1,7 @@
 # ADO Git Repo Seeder (v1.1.0)
 
 <!-- BADGES:START -->
-[![CI](https://github.com/oddessentials/ado-git-repo-seeder/actions/workflows/ci.yml/badge.svg)](https://github.com/oddessentials/ado-git-repo-seeder/actions/workflows/ci.yml) [![Coverage](https://img.shields.io/badge/coverage-78%25-yellow)](./coverage/index.html) [![Version](https://img.shields.io/badge/version-1.1.0-blue)](./package.json) [![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-green)](./package.json)
+[![CI](https://github.com/oddessentials/ado-git-repo-seeder/actions/workflows/ci.yml/badge.svg)](https://github.com/oddessentials/ado-git-repo-seeder/actions/workflows/ci.yml) [![Coverage](https://img.shields.io/badge/coverage-77%25-yellow)](./coverage/index.html) [![Version](https://img.shields.io/badge/version-1.1.0-blue)](./package.json) [![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-green)](./package.json)
 <!-- BADGES:END -->
 
 A professional, configurable Node.js tool to seed realistic, multi-user Pull Request activity in Azure DevOps.
