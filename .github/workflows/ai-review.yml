@@ -23,9 +23,9 @@ jobs:
       runs_on: '["self-hosted", "linux"]'
       # runs_on: '["ubuntu-latest"]' if default and not needed but here to be explicit
 
-    # secrets:
-      # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       # Optional w/ OSCR:
       # OLLAMA_BASE_URL: ${{ secrets.OLLAMA_BASE_URL }}
       # Optional overrides:
