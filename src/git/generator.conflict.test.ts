@@ -18,8 +18,19 @@ describe('GitGenerator.resolveConflicts', () => {
         vi.clearAllMocks();
         generator = new GitGenerator(new SeededRng(12345));
 
+        // Track call count for rev-parse to return different values before/after merge
+        let revParseCallCount = 0;
+
         // Default successful mock for all git commands
-        (exec as any).mockResolvedValue({ stdout: '', stderr: '', code: 0 });
+        (exec as any).mockImplementation((cmd: string, args: string[]) => {
+            if (args.includes('rev-parse')) {
+                // Return different SHAs before and after merge to simulate merge creating new commit
+                revParseCallCount++;
+                const sha = revParseCallCount === 1 ? 'abc123before' : 'def456after';
+                return Promise.resolve({ stdout: sha, stderr: '', code: 0 });
+            }
+            return Promise.resolve({ stdout: '', stderr: '', code: 0 });
+        });
     });
 
     describe('successful resolution', () => {
@@ -285,7 +296,18 @@ describe('resolveConflicts integration scenarios', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         generator = new GitGenerator(new SeededRng(12345));
-        (exec as any).mockResolvedValue({ stdout: '', stderr: '', code: 0 });
+
+        // Track call count for rev-parse to return different values before/after merge
+        let revParseCallCount = 0;
+
+        (exec as any).mockImplementation((cmd: string, args: string[]) => {
+            if (args.includes('rev-parse')) {
+                revParseCallCount++;
+                const sha = revParseCallCount === 1 ? 'abc123before' : 'def456after';
+                return Promise.resolve({ stdout: sha, stderr: '', code: 0 });
+            }
+            return Promise.resolve({ stdout: '', stderr: '', code: 0 });
+        });
     });
 
     describe('conflict detection flow', () => {

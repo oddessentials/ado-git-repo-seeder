@@ -219,7 +219,7 @@ export class GitGenerator {
         pat: string,
         sourceBranch: string,
         targetBranch: string = 'main'
-    ): Promise<{ resolved: boolean; error?: string }> {
+    ): Promise<{ resolved: boolean; error?: string; newCommitSha?: string }> {
         const url = new URL(remoteUrl);
         url.username = 'seeder';
         url.password = '';
@@ -257,8 +257,14 @@ export class GitGenerator {
                 env
             );
 
+            // Get HEAD SHA before merge for comparison
+            const headBeforeResult = await this.git(repoPath, ['rev-parse', 'HEAD']);
+            const headBefore = headBeforeResult.stdout.trim();
+            console.log(`      HEAD before merge: ${headBefore}`);
+
             // Merge target into source with auto-resolution favoring source changes
             // -X ours means "on conflict, take our (source) version"
+            let mergeSucceeded = false;
             try {
                 await this.git(repoPath, [
                     'merge',
@@ -268,7 +274,9 @@ export class GitGenerator {
                     '-m',
                     `Merge ${targetBranch} into ${sourceBranch} (auto-resolved conflicts)`,
                 ]);
+                mergeSucceeded = true;
             } catch (mergeError) {
+                console.log(`      Merge failed, trying fallback: ${mergeError}`);
                 // If merge still fails (shouldn't with -X ours, but just in case),
                 // try a more aggressive approach: reset merge and just commit current state
                 try {
@@ -276,23 +284,35 @@ export class GitGenerator {
                 } catch {
                     // Ignore if no merge to abort
                 }
+            }
 
-                // Last resort: just add a dummy commit to make the branch "different"
-                // This shouldn't be needed, but ensures we always have something to push
+            // Get HEAD SHA after merge
+            const headAfterResult = await this.git(repoPath, ['rev-parse', 'HEAD']);
+            let headAfter = headAfterResult.stdout.trim();
+            console.log(`      HEAD after merge: ${headAfter}`);
+
+            // If HEAD didn't change, we need to create a new commit
+            if (headAfter === headBefore) {
+                console.log(`      ⚠️ No new commit from merge, creating dummy commit...`);
                 const dummyFile = join(repoPath, '.conflict-resolved');
                 writeFileSync(dummyFile, `Conflict auto-resolved at ${new Date().toISOString()}\n`);
                 await this.git(repoPath, ['add', '.']);
                 await this.git(repoPath, ['commit', '-m', 'Auto-resolve: ensure branch is mergeable']);
+
+                // Get final HEAD
+                const headFinalResult = await this.git(repoPath, ['rev-parse', 'HEAD']);
+                headAfter = headFinalResult.stdout.trim();
+                console.log(`      HEAD after dummy commit: ${headAfter}`);
             }
 
             // Force push the source branch back using explicit refspec
             // Use refs/heads/ format to ensure ADO recognizes the push correctly
             const refspec = `refs/heads/${sourceBranch}:refs/heads/${sourceBranch}`;
-            console.log(`      Pushing ${refspec}...`);
+            console.log(`      Pushing ${refspec} (SHA: ${headAfter.slice(0, 7)})...`);
             await this.git(repoPath, ['push', '--force', 'origin', refspec], true, env);
             console.log(`      Push completed successfully`);
 
-            return { resolved: true };
+            return { resolved: true, newCommitSha: headAfter };
         } catch (error) {
             return {
                 resolved: false,
