@@ -34,7 +34,7 @@ describe('GitGenerator.resolveConflicts', () => {
             expect(result.resolved).toBe(true);
             expect(exec).toHaveBeenCalledWith(
                 'git',
-                expect.arrayContaining(['clone', '--depth', '50']),
+                expect.arrayContaining(['clone', '--depth', '200']),
                 expect.any(Object)
             );
         });
@@ -112,7 +112,7 @@ describe('GitGenerator.resolveConflicts', () => {
             );
         });
 
-        it('force pushes the resolved branch', async () => {
+        it('force pushes the resolved branch with explicit refspec', async () => {
             await generator.resolveConflicts(
                 'https://dev.azure.com/org/project/_git/repo',
                 'fake-pat',
@@ -122,7 +122,12 @@ describe('GitGenerator.resolveConflicts', () => {
 
             expect(exec).toHaveBeenCalledWith(
                 'git',
-                expect.arrayContaining(['push', '--force', 'origin', 'feature/branch']),
+                expect.arrayContaining([
+                    'push',
+                    '--force',
+                    'origin',
+                    'refs/heads/feature/branch:refs/heads/feature/branch',
+                ]),
                 expect.any(Object)
             );
         });

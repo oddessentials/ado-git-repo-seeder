@@ -232,8 +232,8 @@ export class GitGenerator {
         try {
             const env = { GIT_ASKPASS: askPass.path };
 
-            // Clone the repo (shallow clone for speed)
-            await this.git(tempDir, ['clone', '--depth', '50', cleanUrl, 'repo'], true, env);
+            // Clone the repo (shallow clone for speed, depth 200 handles large divergence)
+            await this.git(tempDir, ['clone', '--depth', '200', cleanUrl, 'repo'], true, env);
             const repoPath = join(tempDir, 'repo');
 
             // Configure git
@@ -285,8 +285,12 @@ export class GitGenerator {
                 await this.git(repoPath, ['commit', '-m', 'Auto-resolve: ensure branch is mergeable']);
             }
 
-            // Force push the source branch back
-            await this.git(repoPath, ['push', '--force', 'origin', sourceBranch], true, env);
+            // Force push the source branch back using explicit refspec
+            // Use refs/heads/ format to ensure ADO recognizes the push correctly
+            const refspec = `refs/heads/${sourceBranch}:refs/heads/${sourceBranch}`;
+            console.log(`      Pushing ${refspec}...`);
+            await this.git(repoPath, ['push', '--force', 'origin', refspec], true, env);
+            console.log(`      Push completed successfully`);
 
             return { resolved: true };
         } catch (error) {
