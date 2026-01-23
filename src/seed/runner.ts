@@ -651,6 +651,39 @@ export class SeedRunner {
     }
 
     /**
+     * Waits for ADO to report mergeStatus as 'succeeded' after updates.
+     *
+     * @returns PR details with mergeStatus 'succeeded', or null if timeout
+     */
+    private async waitForMergeStatusSuccess(
+        project: string,
+        repoId: string,
+        prId: number,
+        maxWaitMs: number = 60000
+    ): Promise<Awaited<ReturnType<PrManager['getPrDetails']>> | null> {
+        const pollIntervalMs = 2000;
+        const startTime = Date.now();
+        let lastStatus: string | undefined;
+
+        while (Date.now() - startTime < maxWaitMs) {
+            const prDetails = await this.prManager.getPrDetails(project, repoId, prId);
+            lastStatus = prDetails.mergeStatus;
+
+            if (lastStatus === 'succeeded') {
+                return prDetails;
+            }
+
+            console.log(`   ⏳ PR #${prId} merge status is '${lastStatus ?? 'undefined'}', waiting for success...`);
+            await new Promise((r) => setTimeout(r, pollIntervalMs));
+        }
+
+        console.log(
+            `   ⚠️  PR #${prId} merge status did not reach 'succeeded' after ${maxWaitMs}ms (last=${lastStatus ?? 'undefined'})`
+        );
+        return null;
+    }
+
+    /**
      * Waits for ADO to mark the PR as completed after a completion request.
      *
      * @returns true when status is 'completed', false on timeout
@@ -733,6 +766,9 @@ export class SeedRunner {
                     const statusLabel = mergeStatus ?? 'unknown';
                     console.log(`   ⚠️  PR #${prId} merge status is '${statusLabel}', auto-resolving...`);
 
+                    // Capture source commit before resolution to verify push succeeded
+                    const commitIdBeforeResolution = prDetails.lastMergeSourceCommit?.commitId;
+
                     // Resolve conflicts by merging target into source with -X ours
                     const resolution = await this.gitGenerator.resolveConflicts(
                         remoteUrl,
@@ -747,10 +783,7 @@ export class SeedRunner {
                         // This handles transient failures (network errors, etc.)
                         // Continue to try completion anyway - bypassPolicy might help
                     } else {
-                        console.log(`   ✅ Conflicts resolved for PR #${prId}`);
-                        // Only mark as attempted when resolution actually succeeded
-                        // This prevents unnecessary re-resolution while allowing retry after transient failures
-                        conflictResolutionAttempted = true;
+                        console.log(`   ✅ Conflicts resolved for PR #${prId}, verifying push...`);
 
                         // Wait for ADO to re-evaluate merge status after our push
                         const refreshed = await this.waitForMergeStatusEvaluation(project, repoId, prId, 15000);
@@ -760,6 +793,39 @@ export class SeedRunner {
                             // Timeout - get latest details and continue
                             prDetails = await this.prManager.getPrDetails(project, repoId, prId);
                         }
+
+                        // Verify force-push actually updated the PR source branch
+                        const commitIdAfterResolution = prDetails.lastMergeSourceCommit?.commitId;
+                        if (commitIdBeforeResolution && commitIdAfterResolution === commitIdBeforeResolution) {
+                            console.log(
+                                `   ❌ PR #${prId} source commit unchanged after resolution (${commitIdBeforeResolution?.slice(0, 7)}). Force-push may have failed.`
+                            );
+                            // Don't mark as attempted - allow retry
+                        } else {
+                            console.log(
+                                `   ✅ PR #${prId} source commit updated: ${commitIdBeforeResolution?.slice(0, 7) ?? 'none'} → ${commitIdAfterResolution?.slice(0, 7) ?? 'none'}`
+                            );
+                            // Only mark as attempted when resolution AND push verified
+                            conflictResolutionAttempted = true;
+                        }
+                    }
+                }
+
+                // Step 2.5: Wait for merge status to succeed, but don't fail if it doesn't
+                // bypassPolicy: true may allow completion even if mergeStatus isn't 'succeeded'
+                if (prDetails.mergeStatus !== 'succeeded') {
+                    console.log(
+                        `   ⏳ PR #${prId} mergeStatus is '${prDetails.mergeStatus ?? 'undefined'}', waiting up to 60s for success...`
+                    );
+                    const successDetails = await this.waitForMergeStatusSuccess(project, repoId, prId, 60000);
+                    if (successDetails) {
+                        prDetails = successDetails;
+                        console.log(`   ✅ PR #${prId} mergeStatus reached 'succeeded'`);
+                    } else {
+                        // HARDENING: Don't return false here - attempt completion anyway with bypassPolicy
+                        console.log(
+                            `   ⚠️  PR #${prId} mergeStatus did not reach 'succeeded', attempting completion with bypassPolicy...`
+                        );
                     }
                 }
 
@@ -768,11 +834,18 @@ export class SeedRunner {
                 if (!commitId) {
                     // If commitId is missing, ADO likely hasn't evaluated yet
                     // Throw to trigger retry with backoff rather than sending empty commitId
+                    console.log(
+                        `   ⏳ PR #${prId} missing lastMergeSourceCommit.commitId (mergeStatus: ${prDetails.mergeStatus ?? 'undefined'}), will retry...`
+                    );
                     throw Object.assign(
                         new Error(`PR #${prId} missing lastMergeSourceCommit - ADO may still be evaluating`),
                         { status: 409 }
                     );
                 }
+
+                console.log(
+                    `   🚀 PR #${prId} attempting completion (commitId: ${commitId.slice(0, 7)}, mergeStatus: ${prDetails.mergeStatus ?? 'undefined'})`
+                );
 
                 await this.prManager.completePr(project, repoId, prId, commitId, {
                     bypassPolicy: true,
@@ -784,6 +857,7 @@ export class SeedRunner {
                     return false;
                 }
 
+                console.log(`   ✅ PR #${prId} successfully completed and verified`);
                 return true;
             } catch (error: any) {
                 const isRetryable = error.status === 409 || error.status === 400;
@@ -798,9 +872,11 @@ export class SeedRunner {
                     continue;
                 }
 
-                // Log the error but don't throw - we'll return false
+                // Log detailed error including ADO response data to distinguish permission, policy, and timing failures
+                const adoData = error?.response?.data ?? error?.data;
+                const adoMessage = adoData ? ` ADO response: ${JSON.stringify(adoData)}` : '';
                 console.log(
-                    `   ❌ Failed to complete PR #${prId}: ${error instanceof Error ? error.message : String(error)}`
+                    `   ❌ Failed to complete PR #${prId}: ${error instanceof Error ? error.message : String(error)}${adoMessage}`
                 );
                 return false;
             }

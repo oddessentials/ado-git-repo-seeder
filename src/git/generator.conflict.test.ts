@@ -34,7 +34,7 @@ describe('GitGenerator.resolveConflicts', () => {
             expect(result.resolved).toBe(true);
             expect(exec).toHaveBeenCalledWith(
                 'git',
-                expect.arrayContaining(['clone', '--depth', '50']),
+                expect.arrayContaining(['clone', '--depth', '200']),
                 expect.any(Object)
             );
         });

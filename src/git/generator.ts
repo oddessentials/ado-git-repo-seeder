@@ -232,8 +232,8 @@ export class GitGenerator {
         try {
             const env = { GIT_ASKPASS: askPass.path };
 
-            // Clone the repo (shallow clone for speed)
-            await this.git(tempDir, ['clone', '--depth', '50', cleanUrl, 'repo'], true, env);
+            // Clone the repo (shallow clone for speed, depth 200 handles large divergence)
+            await this.git(tempDir, ['clone', '--depth', '200', cleanUrl, 'repo'], true, env);
             const repoPath = join(tempDir, 'repo');
 
             // Configure git
