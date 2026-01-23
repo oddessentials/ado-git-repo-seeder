@@ -209,10 +209,10 @@ export class GitGenerator {
 
     /**
      * Resolves merge conflicts by merging target branch into source branch.
-     * Uses '--strategy-option=ours' to auto-resolve conflicts in favor of source branch.
-     * This ensures PRs can complete regardless of conflicts (activity is what matters).
+     * Uses '-X ours' to auto-resolve conflicts in favor of source branch.
+     * Also uses '--allow-unrelated-histories' because we have evidence it occurs.
      *
-     * @returns true if conflicts were resolved and pushed, false if no conflicts or resolution failed
+     * @returns resolved=true if we produced a new head commit on the source branch AND pushed it
      */
     async resolveConflicts(
         remoteUrl: string,
@@ -225,92 +225,94 @@ export class GitGenerator {
         url.password = '';
         const cleanUrl = url.toString();
 
-        // Create temp directory for the clone
         const tempDir = mkdtempSync(join(tmpdir(), 'ado-conflict-resolve-'));
         const askPass = this.createAskPassScript(pat);
 
         try {
-            const env = { GIT_ASKPASS: askPass.path };
+            const env: NodeJS.ProcessEnv = {
+                GIT_ASKPASS: askPass.path,
+                GIT_TERMINAL_PROMPT: '0',
+            };
 
-            // Clone the repo (shallow clone for speed, depth 200 handles large divergence)
-            await this.git(tempDir, ['clone', '--depth', '200', cleanUrl, 'repo'], true, env);
+            // Clone into a dedicated folder (avoid nesting cwd weirdness)
             const repoPath = join(tempDir, 'repo');
+            await this.git(tempDir, ['clone', '--no-single-branch', '--depth', '200', cleanUrl, 'repo'], true, env);
 
-            // Configure git
+            // Configure identity
             await this.git(repoPath, ['config', 'user.email', 'seeder@example.com']);
             await this.git(repoPath, ['config', 'user.name', 'ADO Seeder']);
 
-            // Fetch the source branch and create a tracking ref
-            await this.git(
-                repoPath,
-                ['fetch', 'origin', `${sourceBranch}:refs/remotes/origin/${sourceBranch}`],
-                true,
-                env
-            );
-            await this.git(repoPath, ['checkout', '-b', sourceBranch, `origin/${sourceBranch}`]);
+            // Always fetch latest refs for both branches
+            await this.git(repoPath, ['fetch', 'origin', '--prune'], true, env);
+            await this.git(repoPath, ['fetch', 'origin', sourceBranch], true, env);
+            await this.git(repoPath, ['fetch', 'origin', targetBranch], true, env);
 
-            // Fetch target branch and create a tracking ref
-            await this.git(
-                repoPath,
-                ['fetch', 'origin', `${targetBranch}:refs/remotes/origin/${targetBranch}`],
-                true,
-                env
-            );
+            // Checkout source branch exactly from origin/<sourceBranch>
+            // Use -B to reset local branch to remote tip deterministically.
+            await this.git(repoPath, ['checkout', '-B', sourceBranch, `origin/${sourceBranch}`], true, env);
 
-            // Get HEAD SHA before merge for comparison
+            // Record head before
             const headBeforeResult = await this.git(repoPath, ['rev-parse', 'HEAD']);
             const headBefore = headBeforeResult.stdout.trim();
             console.log(`      HEAD before merge: ${headBefore}`);
 
-            // Merge target into source with auto-resolution favoring source changes
-            // -X ours means "on conflict, take our (source) version"
-            let mergeSucceeded = false;
+            // Attempt merge
+            let merged = false;
             try {
                 await this.git(repoPath, [
                     'merge',
                     `origin/${targetBranch}`,
+                    '--allow-unrelated-histories',
                     '-X',
                     'ours',
                     '-m',
                     `Merge ${targetBranch} into ${sourceBranch} (auto-resolved conflicts)`,
                 ]);
-                mergeSucceeded = true;
+                merged = true;
             } catch (mergeError) {
-                console.log(`      Merge failed, trying fallback: ${mergeError}`);
-                // If merge still fails (shouldn't with -X ours, but just in case),
-                // try a more aggressive approach: reset merge and just commit current state
+                console.log(`      Merge failed, attempting fallback commit: ${mergeError}`);
+                // Abort any partial merge if present
                 try {
                     await this.git(repoPath, ['merge', '--abort']);
                 } catch {
-                    // Ignore if no merge to abort
+                    // ignore
                 }
             }
 
-            // Get HEAD SHA after merge
-            const headAfterResult = await this.git(repoPath, ['rev-parse', 'HEAD']);
-            let headAfter = headAfterResult.stdout.trim();
+            // If merge didn't create a new commit (or merge failed), ensure we still move HEAD
+            let headAfter = (await this.git(repoPath, ['rev-parse', 'HEAD'])).stdout.trim();
             console.log(`      HEAD after merge: ${headAfter}`);
 
-            // If HEAD didn't change, we need to create a new commit
-            if (headAfter === headBefore) {
-                console.log(`      ⚠️ No new commit from merge, creating dummy commit...`);
-                const dummyFile = join(repoPath, '.conflict-resolved');
-                writeFileSync(dummyFile, `Conflict auto-resolved at ${new Date().toISOString()}\n`);
+            if (!merged || headAfter === headBefore) {
+                console.log(`      ⚠️ No new merge commit, creating deterministic resolution commit...`);
+                const marker = join(repoPath, '.conflict-resolved');
+                writeFileSync(marker, `Conflict resolution marker: ${new Date().toISOString()}\n`);
                 await this.git(repoPath, ['add', '.']);
-                await this.git(repoPath, ['commit', '-m', 'Auto-resolve: ensure branch is mergeable']);
-
-                // Get final HEAD
-                const headFinalResult = await this.git(repoPath, ['rev-parse', 'HEAD']);
-                headAfter = headFinalResult.stdout.trim();
-                console.log(`      HEAD after dummy commit: ${headAfter}`);
+                await this.git(repoPath, ['commit', '-m', 'Auto-resolve: move source branch head'], true, env);
+                headAfter = (await this.git(repoPath, ['rev-parse', 'HEAD'])).stdout.trim();
+                console.log(`      HEAD after fallback commit: ${headAfter}`);
             }
 
-            // Force push the source branch back using explicit refspec
-            // Use refs/heads/ format to ensure ADO recognizes the push correctly
-            const refspec = `refs/heads/${sourceBranch}:refs/heads/${sourceBranch}`;
+            // Push the current HEAD to the source branch ref explicitly.
+            const refspec = `HEAD:refs/heads/${sourceBranch}`;
             console.log(`      Pushing ${refspec} (SHA: ${headAfter.slice(0, 7)})...`);
             await this.git(repoPath, ['push', '--force', 'origin', refspec], true, env);
             console.log(`      Push completed successfully`);
+
+            // Verify remote ref moved to our SHA (critical!)
+            const remoteHead = await this.git(
+                repoPath,
+                ['ls-remote', '--heads', 'origin', `refs/heads/${sourceBranch}`],
+                true,
+                env
+            );
+            const remoteSha = remoteHead.stdout.trim().split(/\s+/)[0] || '';
+            if (!remoteSha || remoteSha.toLowerCase() !== headAfter.toLowerCase()) {
+                return {
+                    resolved: false,
+                    error: `Push did not move remote ref. local=${headAfter.slice(0, 7)} remote=${remoteSha.slice(0, 7) || 'unknown'}`,
+                };
+            }
 
             return { resolved: true, newCommitSha: headAfter };
         } catch (error) {
@@ -320,11 +322,10 @@ export class GitGenerator {
             };
         } finally {
             askPass.cleanup();
-            // Cleanup temp directory
             try {
                 rmSync(tempDir, { recursive: true, force: true });
             } catch {
-                // Ignore cleanup errors
+                // ignore
             }
         }
     }

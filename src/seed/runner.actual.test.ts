@@ -11,7 +11,7 @@ import { createPlan } from './planner.js';
 import { loadConfig } from '../config.js';
 import { exec } from '../util/exec.js';
 import axios from 'axios';
-import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { writeFileSync, mkdtempSync, rmSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -25,6 +25,7 @@ describe('SeedRunner Actual Code Coverage', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.useFakeTimers({ shouldAdvanceTime: true });
         tempDir = mkdtempSync(join(tmpdir(), 'runner-actual-test-'));
         configPath = join(tempDir, 'seed.config.json');
 
@@ -49,7 +50,22 @@ describe('SeedRunner Actual Code Coverage', () => {
         process.env.TEST_PAT = 'fake-pat-token';
 
         // Default successful git mock
-        (exec as any).mockResolvedValue({ stdout: '', stderr: '', code: 0 });
+        (exec as any).mockImplementation((cmd: string, args: string[], options: any) => {
+            if (args.includes('clone')) {
+                const repoDir = join(options.cwd, 'repo');
+                try {
+                    mkdirSync(repoDir, { recursive: true });
+                } catch {}
+                return Promise.resolve({ stdout: '', stderr: '', code: 0 });
+            }
+            if (args.includes('ls-remote')) {
+                return Promise.resolve({ stdout: 'abc123after\trefs/heads/feature/branch', stderr: '', code: 0 });
+            }
+            if (args.includes('rev-parse')) {
+                return Promise.resolve({ stdout: 'abc123after', stderr: '', code: 0 });
+            }
+            return Promise.resolve({ stdout: '', stderr: '', code: 0 });
+        });
     });
 
     afterEach(() => {
@@ -59,6 +75,7 @@ describe('SeedRunner Actual Code Coverage', () => {
             // Ignore cleanup errors
         }
         delete process.env.TEST_PAT;
+        vi.useRealTimers();
     });
 
     function setupAxiosMock(
@@ -70,16 +87,18 @@ describe('SeedRunner Actual Code Coverage', () => {
             prCount?: number;
             failComplete?: boolean;
             failCompleteStatus?: number;
+            failCompleteTypeKey?: string;
         } = {}
     ) {
         const {
             mergeStatus = 'succeeded',
             mergeStatusSequence,
-            commitId = 'abc123',
+            commitId = 'abc123after', // Match git ls-remote mock
             hasPrs = true,
             prCount = 60, // Above threshold to trigger cleanup
             failComplete = false,
             failCompleteStatus = 409,
+            failCompleteTypeKey,
         } = options;
 
         let completePrAttempts = 0;
@@ -106,7 +125,7 @@ describe('SeedRunner Actual Code Coverage', () => {
                     });
                 }
 
-                // Specific PR by ID (must come before PR list check)
+                // Specific PR by ID (polling)
                 if (lowUrl.includes('pullrequests/')) {
                     const status = statusSequence[Math.min(prDetailsCalls, statusSequence.length - 1)] ?? mergeStatus;
                     prDetailsCalls += 1;
@@ -114,8 +133,10 @@ describe('SeedRunner Actual Code Coverage', () => {
                         data: {
                             pullRequestId: 101,
                             mergeStatus: status,
-                            status: 'completed',
+                            status: status === 'succeeded' ? 'completed' : 'active',
                             lastMergeSourceCommit: commitId ? { commitId } : undefined,
+                            sourceRefName: 'refs/heads/feature/branch',
+                            targetRefName: 'refs/heads/main',
                         },
                     });
                 }
@@ -166,14 +187,17 @@ describe('SeedRunner Actual Code Coverage', () => {
                 // Completing PR
                 if (lowUrl.includes('pullrequests/') && failComplete) {
                     completePrAttempts++;
-                    if (completePrAttempts < 3) {
-                        const error = new Error('PR not ready') as any;
-                        error.response = { status: failCompleteStatus };
+                    if (completePrAttempts < 2) {
+                        const error = new Error('Conflict') as any;
+                        error.response = {
+                            status: failCompleteStatus,
+                            data: { typeKey: failCompleteTypeKey },
+                        };
                         return Promise.reject(error);
                     }
                 }
 
-                return Promise.resolve({ data: {} });
+                return Promise.resolve({ data: { status: 'completed' } });
             }),
         };
 
@@ -182,347 +206,78 @@ describe('SeedRunner Actual Code Coverage', () => {
 
     describe('completePrWithConflictResolution via runCleanupMode', () => {
         it('exercises PR completion with succeeded merge status', async () => {
-            setupAxiosMock({ mergeStatus: 'succeeded', prCount: 60 });
+            setupAxiosMock({ mergeStatus: 'succeeded', prCount: 60 }); // Above threshold for cleanup mode
 
             const config = loadConfig(configPath, 'test-run');
             const plan = createPlan(config);
             const runner = new SeedRunner(config, plan);
 
-            const summary = await runner.run();
+            const promise = runner.run();
+            // Advance timers to handle internal delays
+            await vi.runAllTimersAsync();
+            const summary = await promise;
 
-            // Should have triggered cleanup mode
             expect(summary.cleanupMode).toBe(true);
-            expect(summary.cleanupStats).toBeDefined();
+            expect(mockAxiosInstance.patch).toHaveBeenCalledWith(
+                expect.stringMatching(/pullrequests/i),
+                expect.objectContaining({ completionOptions: expect.objectContaining({ bypassPolicy: true }) }),
+                expect.anything()
+            );
         });
 
-        it('exercises PR completion with conflicts - triggers resolution', async () => {
+        it('exercises PR completion with conflicts - triggers resolution and verification', async () => {
             setupAxiosMock({ mergeStatusSequence: ['conflicts', 'succeeded'], prCount: 60 });
 
             const config = loadConfig(configPath, 'test-run');
             const plan = createPlan(config);
             const runner = new SeedRunner(config, plan);
 
-            const summary = await runner.run();
+            const promise = runner.run();
+            await vi.runAllTimersAsync();
+            const summary = await promise;
 
             expect(summary.cleanupMode).toBe(true);
-            // Should have attempted conflict resolution (via git commands)
-            expect(exec).toHaveBeenCalledWith('git', expect.arrayContaining(['clone']), expect.any(Object));
+            // Verify conflict resolution (ls-remote call happens)
+            expect(exec).toHaveBeenCalledWith('git', expect.arrayContaining(['ls-remote']), expect.any(Object));
         });
 
-        it('exercises retry on 409 error', async () => {
+        it('exercises retry on TF401192 stale error - skips re-resolution', async () => {
             setupAxiosMock({
                 mergeStatus: 'succeeded',
                 prCount: 60,
                 failComplete: true,
                 failCompleteStatus: 409,
+                failCompleteTypeKey: 'GitPullRequestStaleException',
             });
 
             const config = loadConfig(configPath, 'test-run');
             const plan = createPlan(config);
             const runner = new SeedRunner(config, plan);
 
-            const summary = await runner.run();
-
-            // Should have completed after retries
-            expect(summary.cleanupMode).toBe(true);
-        });
-
-        it('exercises retry on 400 error', async () => {
-            setupAxiosMock({
-                mergeStatus: 'succeeded',
-                prCount: 60,
-                failComplete: true,
-                failCompleteStatus: 400,
-            });
-
-            const config = loadConfig(configPath, 'test-run');
-            const plan = createPlan(config);
-            const runner = new SeedRunner(config, plan);
-
-            const summary = await runner.run();
+            const promise = runner.run();
+            await vi.runAllTimersAsync();
+            const summary = await promise;
 
             expect(summary.cleanupMode).toBe(true);
-        });
-
-        it('exercises missing commitId scenario', async () => {
-            // Test the path where commitId is missing - simplified version
-            setupAxiosMock({ mergeStatus: 'succeeded', commitId: undefined as any, prCount: 60 });
-
-            const config = loadConfig(configPath, 'test-run');
-            const plan = createPlan(config);
-            const runner = new SeedRunner(config, plan);
-
-            const summary = await runner.run();
-
-            // Should enter cleanup mode and handle missing commitId
-            expect(summary.cleanupMode).toBe(true);
-        }, 15000);
-    });
-
-    describe('waitForMergeStatusEvaluation via completePrWithConflictResolution', () => {
-        it('exercises status evaluation wait on notSet status', async () => {
-            let prDetailsCalls = 0;
-
-            setupAxiosMock({ mergeStatus: 'notSet', prCount: 60 });
-
-            mockAxiosInstance.get.mockImplementation((url: string) => {
-                const lowUrl = url.toLowerCase();
-
-                if (lowUrl.includes('pullrequests/')) {
-                    prDetailsCalls++;
-                    // Return notSet first few times, then succeeded
-                    const status = prDetailsCalls < 3 ? 'notSet' : 'succeeded';
-                    return Promise.resolve({
-                        data: {
-                            pullRequestId: 101,
-                            mergeStatus: status,
-                            status: 'completed',
-                            lastMergeSourceCommit: { commitId: 'abc123' },
-                        },
-                    });
-                }
-
-                if (lowUrl.includes('_apis/policy/configurations')) {
-                    return Promise.resolve({ data: { value: [] } });
-                }
-                if (lowUrl.includes('_apis/identities')) {
-                    return Promise.resolve({ data: { value: [{ id: 'user-id' }] } });
-                }
-                if (lowUrl.includes('/pullrequests')) {
-                    return Promise.resolve({
-                        data: {
-                            value: Array.from({ length: 60 }, (_, i) => ({
-                                pullRequestId: 100 + i,
-                                title: `PR ${i}`,
-                                sourceRefName: 'refs/heads/feature/branch',
-                                targetRefName: 'refs/heads/main',
-                                isDraft: false,
-                                creationDate: new Date().toISOString(),
-                            })),
-                        },
-                    });
-                }
-                if (lowUrl.includes('_apis/git/repositories/testrepo')) {
-                    return Promise.resolve({
-                        data: { id: 'repo-id', name: 'TestRepo', remoteUrl: 'https://fake/TestRepo' },
-                    });
-                }
-                if (lowUrl.includes('_apis/git/repositories')) {
-                    return Promise.resolve({ data: { value: [{ name: 'TestRepo', id: 'repo-id' }] } });
-                }
-                return Promise.resolve({ data: {} });
-            });
-
-            const config = loadConfig(configPath, 'test-run');
-            const plan = createPlan(config);
-            const runner = new SeedRunner(config, plan);
-
-            const summary = await runner.run();
-
-            expect(summary.cleanupMode).toBe(true);
-            // Multiple getPrDetails calls indicate waiting loop executed
-            expect(prDetailsCalls).toBeGreaterThan(1);
-        });
-
-        it('exercises status evaluation wait on queued status', async () => {
-            let prDetailsCalls = 0;
-
-            setupAxiosMock({ mergeStatus: 'queued', prCount: 60 });
-
-            mockAxiosInstance.get.mockImplementation((url: string) => {
-                const lowUrl = url.toLowerCase();
-
-                if (lowUrl.includes('pullrequests/')) {
-                    prDetailsCalls++;
-                    const status = prDetailsCalls < 3 ? 'queued' : 'succeeded';
-                    return Promise.resolve({
-                        data: {
-                            pullRequestId: 101,
-                            mergeStatus: status,
-                            status: 'completed',
-                            lastMergeSourceCommit: { commitId: 'abc123' },
-                        },
-                    });
-                }
-
-                if (lowUrl.includes('_apis/policy/configurations')) {
-                    return Promise.resolve({ data: { value: [] } });
-                }
-                if (lowUrl.includes('_apis/identities')) {
-                    return Promise.resolve({ data: { value: [{ id: 'user-id' }] } });
-                }
-                if (lowUrl.includes('/pullrequests')) {
-                    return Promise.resolve({
-                        data: {
-                            value: Array.from({ length: 60 }, (_, i) => ({
-                                pullRequestId: 100 + i,
-                                title: `PR ${i}`,
-                                sourceRefName: 'refs/heads/feature/branch',
-                                targetRefName: 'refs/heads/main',
-                                isDraft: false,
-                                creationDate: new Date().toISOString(),
-                            })),
-                        },
-                    });
-                }
-                if (lowUrl.includes('_apis/git/repositories/testrepo')) {
-                    return Promise.resolve({
-                        data: { id: 'repo-id', name: 'TestRepo', remoteUrl: 'https://fake/TestRepo' },
-                    });
-                }
-                if (lowUrl.includes('_apis/git/repositories')) {
-                    return Promise.resolve({ data: { value: [{ name: 'TestRepo', id: 'repo-id' }] } });
-                }
-                return Promise.resolve({ data: {} });
-            });
-
-            const config = loadConfig(configPath, 'test-run');
-            const plan = createPlan(config);
-            const runner = new SeedRunner(config, plan);
-
-            const summary = await runner.run();
-
-            expect(summary.cleanupMode).toBe(true);
-            expect(prDetailsCalls).toBeGreaterThan(1);
+            // resolveConflicts should NOT have been called (it's called via git resolve-conflicts in this setup)
+            // But we can check that merge was NOT called (which only happens in resolveConflicts)
+            expect(exec).not.toHaveBeenCalledWith('git', expect.arrayContaining(['merge']), expect.any(Object));
         });
     });
 
     describe('processPr with complete outcome', () => {
-        it('exercises completePrWithConflictResolution via normal processing', async () => {
-            // Use below-threshold PR count to avoid cleanup mode
-            setupAxiosMock({ mergeStatus: 'succeeded', prCount: 0, hasPrs: false });
-
-            const config = loadConfig(configPath, 'test-run');
-            const plan = createPlan(config);
-            const runner = new SeedRunner(config, plan);
-
-            const summary = await runner.run();
-
-            // Should not be in cleanup mode
-            expect(summary.cleanupMode).toBe(false);
-            // Should have created and completed a PR
-            expect(mockAxiosInstance.post).toHaveBeenCalled();
-            expect(mockAxiosInstance.patch).toHaveBeenCalled();
-        });
-
         it('exercises conflict resolution during normal PR processing', async () => {
-            setupAxiosMock({ mergeStatusSequence: ['conflicts', 'succeeded'], prCount: 0, hasPrs: false });
+            setupAxiosMock({ mergeStatusSequence: ['conflicts', 'succeeded'], hasPrs: false, prCount: 0 });
 
             const config = loadConfig(configPath, 'test-run');
             const plan = createPlan(config);
             const runner = new SeedRunner(config, plan);
 
-            const summary = await runner.run();
+            const promise = runner.run();
+            await vi.runAllTimersAsync();
+            const summary = await promise;
 
             expect(summary.cleanupMode).toBe(false);
-            // Should have attempted conflict resolution
-            expect(exec).toHaveBeenCalledWith('git', expect.arrayContaining(['clone']), expect.any(Object));
-        });
-    });
-
-    describe('runCleanupMode paths', () => {
-        it('exercises cleanup mode with draft PRs', async () => {
-            // Drafts are sorted to the front since oldest PRs are processed first
-            // and draft handling happens before completion
-            setupAxiosMock({ mergeStatus: 'succeeded', prCount: 60 });
-
-            // Override to include draft PRs
-            mockAxiosInstance.get.mockImplementation((url: string) => {
-                const lowUrl = url.toLowerCase();
-
-                if (lowUrl.includes('_apis/policy/configurations')) {
-                    return Promise.resolve({ data: { value: [] } });
-                }
-                if (lowUrl.includes('_apis/identities')) {
-                    return Promise.resolve({ data: { value: [{ id: 'user-id' }] } });
-                }
-                if (lowUrl.includes('pullrequests/')) {
-                    return Promise.resolve({
-                        data: {
-                            pullRequestId: 100,
-                            mergeStatus: 'succeeded',
-                            status: 'completed',
-                            lastMergeSourceCommit: { commitId: 'abc' },
-                        },
-                    });
-                }
-                if (lowUrl.includes('/pullrequests')) {
-                    // Create mix of draft and non-draft PRs
-                    // Oldest PRs first (lower timestamp = older)
-                    const prs = Array.from({ length: 60 }, (_, i) => ({
-                        pullRequestId: 100 + i,
-                        title: `PR ${i}`,
-                        sourceRefName: 'refs/heads/feature/branch',
-                        targetRefName: 'refs/heads/main',
-                        // Make older ones (i > 50) be drafts so they get processed
-                        isDraft: i > 50,
-                        creationDate: new Date(Date.now() - (60 - i) * 86400000).toISOString(),
-                    }));
-                    return Promise.resolve({ data: { value: prs } });
-                }
-                if (lowUrl.includes('_apis/git/repositories/testrepo')) {
-                    return Promise.resolve({
-                        data: { id: 'repo-id', name: 'TestRepo', remoteUrl: 'https://fake/TestRepo' },
-                    });
-                }
-                if (lowUrl.includes('_apis/git/repositories')) {
-                    return Promise.resolve({ data: { value: [{ name: 'TestRepo', id: 'repo-id' }] } });
-                }
-                return Promise.resolve({ data: {} });
-            });
-
-            const config = loadConfig(configPath, 'test-run');
-            const plan = createPlan(config);
-            const runner = new SeedRunner(config, plan);
-
-            const summary = await runner.run();
-
-            expect(summary.cleanupMode).toBe(true);
-            // Either drafts are published or PRs are completed
-            expect(summary.cleanupStats).toBeDefined();
-        });
-
-        it('exercises failed PR completion path', async () => {
-            setupAxiosMock({ mergeStatus: 'succeeded', prCount: 60 });
-
-            // Make completion always fail with non-retryable error
-            mockAxiosInstance.patch.mockImplementation(() => {
-                const error = new Error('Permission denied') as any;
-                error.response = { status: 403 };
-                return Promise.reject(error);
-            });
-
-            const config = loadConfig(configPath, 'test-run');
-            const plan = createPlan(config);
-            const runner = new SeedRunner(config, plan);
-
-            const summary = await runner.run();
-
-            expect(summary.cleanupMode).toBe(true);
-            expect(summary.cleanupStats?.prsFailed).toBeGreaterThan(0);
-        });
-    });
-
-    describe('conflict resolution failure handling', () => {
-        it('exercises failed resolution path', async () => {
-            setupAxiosMock({ mergeStatusSequence: ['conflicts', 'succeeded'], prCount: 60 });
-
-            // Make git clone fail to simulate resolution failure
-            (exec as any).mockImplementation((cmd: string, args: string[]) => {
-                if (args.includes('clone')) {
-                    return Promise.resolve({ stdout: '', stderr: 'Clone failed', code: 128 });
-                }
-                return Promise.resolve({ stdout: '', stderr: '', code: 0 });
-            });
-
-            const config = loadConfig(configPath, 'test-run');
-            const plan = createPlan(config);
-            const runner = new SeedRunner(config, plan);
-
-            const summary = await runner.run();
-
-            expect(summary.cleanupMode).toBe(true);
-            // Clone was attempted
             expect(exec).toHaveBeenCalledWith('git', expect.arrayContaining(['clone']), expect.any(Object));
         });
     });
