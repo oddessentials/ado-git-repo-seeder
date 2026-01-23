@@ -12,6 +12,11 @@ passes:
     enabled: true
     required: true # Fail the check if semgrep finds issues
 
+# Cloud AI review (requires OPENAI_API_KEY or ANTHROPIC_API_KEY)
+  - name: cloud-ai
+    agents: [opencode, pr_agent]
+    enabled: true
+
 # AI review - if running sidecar
   - name: local-ai
     agents: [local_llm]
