@@ -14,7 +14,7 @@ jobs:
     # Block fork PRs for security (self-hosted runners should not run untrusted code)
     if: github.event.pull_request.head.repo.full_name == github.repository
 
-    uses: oddessentials/odd-ai-reviewers/.github/workflows/ai-review.yml@main
+    uses: oddessentials/odd-ai-reviewers/.github/workflows/ai-review.yml@feat/ollama-power-up
     with:
       target_repo: ${{ github.repository }}
       target_ref: ${{ github.sha }}
@@ -26,4 +26,8 @@ jobs:
     secrets:
       # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      OLLAMA_BASE_URL: ${{ secrets.OLLAMA_BASE_URL }}
+      # Optional w/ OSCR:
+      # OLLAMA_BASE_URL: ${{ secrets.OLLAMA_BASE_URL }}
+      # Optional overrides:
+      # LOCAL_LLM_NUM_CTX: "32768"     # Larger context (more RAM)
+      # LOCAL_LLM_TIMEOUT: "180000"    # 3 min timeout (slower models)
