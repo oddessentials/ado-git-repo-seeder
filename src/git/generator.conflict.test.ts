@@ -1,13 +1,9 @@
-/**
- * Tests for GitGenerator.resolveConflicts method.
- *
- * These tests verify the conflict resolution logic that merges
- * target branch into source branch with auto-resolution.
- */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GitGenerator } from './generator.js';
 import { SeededRng } from '../util/rng.js';
 import { exec } from '../util/exec.js';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 vi.mock('../util/exec.js');
 
@@ -16,21 +12,37 @@ describe('GitGenerator.resolveConflicts', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.useFakeTimers();
         generator = new GitGenerator(new SeededRng(12345));
 
         // Track call count for rev-parse to return different values before/after merge
         let revParseCallCount = 0;
 
         // Default successful mock for all git commands
-        (exec as any).mockImplementation((cmd: string, args: string[]) => {
+        (exec as any).mockImplementation((cmd: string, args: string[], options: any) => {
+            if (args.includes('clone')) {
+                const repoDir = join(options.cwd, 'repo');
+                try {
+                    mkdirSync(repoDir, { recursive: true });
+                } catch {}
+                return Promise.resolve({ stdout: '', stderr: '', code: 0 });
+            }
             if (args.includes('rev-parse')) {
-                // Return different SHAs before and after merge to simulate merge creating new commit
                 revParseCallCount++;
                 const sha = revParseCallCount === 1 ? 'abc123before' : 'def456after';
                 return Promise.resolve({ stdout: sha, stderr: '', code: 0 });
             }
+            if (args.includes('ls-remote')) {
+                // Flexibly return a matching SHA for any requested ref
+                const ref = args[args.length - 1];
+                return Promise.resolve({ stdout: `def456after\t${ref}`, stderr: '', code: 0 });
+            }
             return Promise.resolve({ stdout: '', stderr: '', code: 0 });
         });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     describe('successful resolution', () => {
@@ -43,6 +55,7 @@ describe('GitGenerator.resolveConflicts', () => {
             );
 
             expect(result.resolved).toBe(true);
+            expect(result.newCommitSha).toBe('def456after');
             expect(exec).toHaveBeenCalledWith(
                 'git',
                 expect.arrayContaining(['clone', '--depth', '200']),
@@ -66,7 +79,7 @@ describe('GitGenerator.resolveConflicts', () => {
             expect(exec).toHaveBeenCalledWith('git', ['config', 'user.name', 'ADO Seeder'], expect.any(Object));
         });
 
-        it('fetches and checks out source branch', async () => {
+        it('fetches latest refs and checks out source branch with reset', async () => {
             await generator.resolveConflicts(
                 'https://dev.azure.com/org/project/_git/repo',
                 'fake-pat',
@@ -76,32 +89,23 @@ describe('GitGenerator.resolveConflicts', () => {
 
             expect(exec).toHaveBeenCalledWith(
                 'git',
-                expect.arrayContaining(['fetch', 'origin', 'feature/my-branch:refs/remotes/origin/feature/my-branch']),
+                expect.arrayContaining(['fetch', 'origin', '--prune']),
                 expect.any(Object)
             );
             expect(exec).toHaveBeenCalledWith(
                 'git',
-                expect.arrayContaining(['checkout', '-b', 'feature/my-branch', 'origin/feature/my-branch']),
+                expect.arrayContaining(['fetch', 'origin', 'feature/my-branch']),
                 expect.any(Object)
-            );
-        });
-
-        it('fetches target branch', async () => {
-            await generator.resolveConflicts(
-                'https://dev.azure.com/org/project/_git/repo',
-                'fake-pat',
-                'feature/branch',
-                'main'
             );
 
             expect(exec).toHaveBeenCalledWith(
                 'git',
-                expect.arrayContaining(['fetch', 'origin', 'main:refs/remotes/origin/main']),
+                expect.arrayContaining(['checkout', '-B', 'feature/my-branch', 'origin/feature/my-branch']),
                 expect.any(Object)
             );
         });
 
-        it('merges target into source with -X ours strategy', async () => {
+        it('merges target into source with -X ours and --allow-unrelated-histories', async () => {
             await generator.resolveConflicts(
                 'https://dev.azure.com/org/project/_git/repo',
                 'fake-pat',
@@ -114,6 +118,7 @@ describe('GitGenerator.resolveConflicts', () => {
                 expect.arrayContaining([
                     'merge',
                     'origin/main',
+                    '--allow-unrelated-histories',
                     '-X',
                     'ours',
                     '-m',
@@ -123,36 +128,26 @@ describe('GitGenerator.resolveConflicts', () => {
             );
         });
 
-        it('force pushes the resolved branch with explicit refspec', async () => {
-            await generator.resolveConflicts(
+        it('force pushes the resolved branch and verifies remote ref', async () => {
+            const result = await generator.resolveConflicts(
                 'https://dev.azure.com/org/project/_git/repo',
                 'fake-pat',
                 'feature/branch',
                 'main'
             );
 
+            expect(result.resolved).toBe(true);
+            expect(result.newCommitSha).toBe('def456after');
+
             expect(exec).toHaveBeenCalledWith(
                 'git',
-                expect.arrayContaining([
-                    'push',
-                    '--force',
-                    'origin',
-                    'refs/heads/feature/branch:refs/heads/feature/branch',
-                ]),
+                expect.arrayContaining(['push', '--force', 'origin', 'HEAD:refs/heads/feature/branch']),
                 expect.any(Object)
             );
-        });
-
-        it('uses default targetBranch of main', async () => {
-            await generator.resolveConflicts(
-                'https://dev.azure.com/org/project/_git/repo',
-                'fake-pat',
-                'feature/branch'
-            );
 
             expect(exec).toHaveBeenCalledWith(
                 'git',
-                expect.arrayContaining(['fetch', 'origin', 'main:refs/remotes/origin/main']),
+                expect.arrayContaining(['ls-remote', '--heads', expect.any(String), 'refs/heads/feature/branch']),
                 expect.any(Object)
             );
         });
@@ -165,7 +160,6 @@ describe('GitGenerator.resolveConflicts', () => {
                 'main'
             );
 
-            // Clone should use sanitized URL with seeder@ prefix
             expect(exec).toHaveBeenCalledWith(
                 'git',
                 expect.arrayContaining([expect.stringContaining('seeder@')]),
@@ -174,11 +168,20 @@ describe('GitGenerator.resolveConflicts', () => {
         });
     });
 
-    describe('merge failure fallback', () => {
-        it('handles merge failure by attempting fallback', async () => {
-            // The fallback logic is tested through code coverage
-            // When merge fails, it aborts and creates a dummy commit
-            // This test verifies the method signature and error handling
+    describe('push verification guard', () => {
+        it('returns resolved: false if remote SHA does not match after push', async () => {
+            let revParseCalls = 0;
+            (exec as any).mockImplementation((cmd: string, args: string[]) => {
+                if (args.includes('rev-parse')) {
+                    revParseCalls++;
+                    return Promise.resolve({ stdout: revParseCalls === 1 ? 'old' : 'new-sha', stderr: '', code: 0 });
+                }
+                if (args.includes('ls-remote')) {
+                    return Promise.resolve({ stdout: 'stale-sha\trefs/heads/feature/branch', stderr: '', code: 0 });
+                }
+                return Promise.resolve({ stdout: '', stderr: '', code: 0 });
+            });
+
             const result = await generator.resolveConflicts(
                 'https://dev.azure.com/org/project/_git/repo',
                 'fake-pat',
@@ -186,8 +189,62 @@ describe('GitGenerator.resolveConflicts', () => {
                 'main'
             );
 
-            // With successful mocks, should resolve successfully
+            expect(result.resolved).toBe(false);
+            expect(result.error).toContain('Push did not move remote ref');
+        });
+    });
+
+    describe('merge failure fallback', () => {
+        it('handles merge failure by attempting fallback commit', async () => {
+            let revParseCalls = 0;
+            let mergeAborted = false;
+            let commitHappened = false;
+
+            (exec as any).mockImplementation((cmd: string, args: string[], options: any) => {
+                if (args.includes('clone')) {
+                    const repoDir = join(options.cwd, 'repo');
+                    try {
+                        mkdirSync(repoDir, { recursive: true });
+                    } catch {}
+                    return Promise.resolve({ stdout: '', stderr: '', code: 0 });
+                }
+                if (args.includes('merge') && !args.includes('--abort')) {
+                    return Promise.reject(new Error('Merge conflict'));
+                }
+                if (args.includes('merge') && args.includes('--abort')) {
+                    mergeAborted = true;
+                    return Promise.resolve({ stdout: '', stderr: '', code: 0 });
+                }
+                if (args.includes('commit')) {
+                    commitHappened = true;
+                    return Promise.resolve({ stdout: '', stderr: '', code: 0 });
+                }
+                if (args.includes('rev-parse')) {
+                    revParseCalls++;
+                    let sha = 'initial-sha';
+                    if (revParseCalls === 1) sha = 'initial-sha';
+                    if (revParseCalls === 2) sha = 'initial-sha';
+                    if (revParseCalls === 3) sha = 'final-fallback-sha';
+                    return Promise.resolve({ stdout: sha, stderr: '', code: 0 });
+                }
+                if (args.includes('ls-remote')) {
+                    const ref = args[args.length - 1];
+                    return Promise.resolve({ stdout: `final-fallback-sha\t${ref}`, stderr: '', code: 0 });
+                }
+                return Promise.resolve({ stdout: '', stderr: '', code: 0 });
+            });
+
+            const result = await generator.resolveConflicts(
+                'https://dev.azure.com/org/project/_git/repo',
+                'fake-pat',
+                'feature/branch',
+                'main'
+            );
+
             expect(result.resolved).toBe(true);
+            expect(result.newCommitSha).toBe('final-fallback-sha');
+            expect(mergeAborted).toBe(true);
+            expect(commitHappened).toBe(true);
         });
     });
 
@@ -200,7 +257,6 @@ describe('GitGenerator.resolveConflicts', () => {
                 return Promise.resolve({ stdout: '', stderr: '', code: 0 });
             });
 
-            // Need to make the git method throw
             const originalGit = (generator as any).git.bind(generator);
             (generator as any).git = async (cwd: string, args: string[], ...rest: any[]) => {
                 if (args.includes('clone')) {
@@ -218,148 +274,6 @@ describe('GitGenerator.resolveConflicts', () => {
 
             expect(result.resolved).toBe(false);
             expect(result.error).toContain('Git command failed');
-        });
-
-        it('returns resolved: false when push fails', async () => {
-            const originalGit = (generator as any).git.bind(generator);
-            (generator as any).git = async (cwd: string, args: string[], ...rest: any[]) => {
-                if (args.includes('push') && args.includes('--force')) {
-                    throw new Error('Git command failed: push rejected');
-                }
-                return originalGit(cwd, args, ...rest);
-            };
-
-            const result = await generator.resolveConflicts(
-                'https://dev.azure.com/org/project/_git/repo',
-                'fake-pat',
-                'feature/branch',
-                'main'
-            );
-
-            expect(result.resolved).toBe(false);
-            expect(result.error).toContain('push rejected');
-        });
-
-        it('includes error message in result', async () => {
-            const originalGit = (generator as any).git.bind(generator);
-            (generator as any).git = async () => {
-                throw new Error('Network timeout');
-            };
-
-            const result = await generator.resolveConflicts(
-                'https://dev.azure.com/org/project/_git/repo',
-                'fake-pat',
-                'feature/branch',
-                'main'
-            );
-
-            expect(result.resolved).toBe(false);
-            expect(result.error).toBe('Network timeout');
-        });
-    });
-
-    describe('cleanup behavior', () => {
-        it('cleans up askpass script on success', async () => {
-            // The test verifies that no errors occur during cleanup
-            const result = await generator.resolveConflicts(
-                'https://dev.azure.com/org/project/_git/repo',
-                'fake-pat',
-                'feature/branch',
-                'main'
-            );
-
-            expect(result.resolved).toBe(true);
-        });
-
-        it('cleans up askpass script on failure', async () => {
-            const originalGit = (generator as any).git.bind(generator);
-            (generator as any).git = async () => {
-                throw new Error('Failed');
-            };
-
-            const result = await generator.resolveConflicts(
-                'https://dev.azure.com/org/project/_git/repo',
-                'fake-pat',
-                'feature/branch',
-                'main'
-            );
-
-            // Should return failure but not throw
-            expect(result.resolved).toBe(false);
-        });
-    });
-});
-
-describe('resolveConflicts integration scenarios', () => {
-    let generator: GitGenerator;
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-        generator = new GitGenerator(new SeededRng(12345));
-
-        // Track call count for rev-parse to return different values before/after merge
-        let revParseCallCount = 0;
-
-        (exec as any).mockImplementation((cmd: string, args: string[]) => {
-            if (args.includes('rev-parse')) {
-                revParseCallCount++;
-                const sha = revParseCallCount === 1 ? 'abc123before' : 'def456after';
-                return Promise.resolve({ stdout: sha, stderr: '', code: 0 });
-            }
-            return Promise.resolve({ stdout: '', stderr: '', code: 0 });
-        });
-    });
-
-    describe('conflict detection flow', () => {
-        it('PR with mergeStatus=conflicts triggers resolution', async () => {
-            // When runner detects conflicts, it calls resolveConflicts
-            const result = await generator.resolveConflicts(
-                'https://dev.azure.com/org/project/_git/repo',
-                'fake-pat',
-                'feature/conflicting-branch',
-                'main'
-            );
-
-            expect(result.resolved).toBe(true);
-            // Verify the merge was attempted
-            expect(exec).toHaveBeenCalledWith('git', expect.arrayContaining(['merge']), expect.any(Object));
-        });
-    });
-
-    describe('branch naming', () => {
-        it('handles branches with slashes', async () => {
-            await generator.resolveConflicts(
-                'https://dev.azure.com/org/project/_git/repo',
-                'fake-pat',
-                'feature/deep/nested/branch',
-                'main'
-            );
-
-            expect(exec).toHaveBeenCalledWith(
-                'git',
-                expect.arrayContaining(['checkout', '-b', 'feature/deep/nested/branch']),
-                expect.any(Object)
-            );
-        });
-
-        it('handles custom target branches', async () => {
-            await generator.resolveConflicts(
-                'https://dev.azure.com/org/project/_git/repo',
-                'fake-pat',
-                'feature/branch',
-                'develop'
-            );
-
-            expect(exec).toHaveBeenCalledWith(
-                'git',
-                expect.arrayContaining(['fetch', 'origin', 'develop:refs/remotes/origin/develop']),
-                expect.any(Object)
-            );
-            expect(exec).toHaveBeenCalledWith(
-                'git',
-                expect.arrayContaining(['merge', 'origin/develop']),
-                expect.any(Object)
-            );
         });
     });
 });

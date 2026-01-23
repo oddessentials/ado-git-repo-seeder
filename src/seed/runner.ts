@@ -7,6 +7,11 @@ import { GitGenerator, BranchSpec } from '../git/generator.js';
 import { SeedPlan, PlannedRepo, PlannedPr, voteToValue } from './planner.js';
 import { SeedSummary, RepoResult, PrResult, FailureRecord } from './summary.js';
 import { SeededRng } from '../util/rng.js';
+import { exec } from '../util/exec.js';
+
+import { writeFileSync, rmSync, chmodSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 export interface CleanupOptions {
     cleanupEnabled: boolean;
@@ -221,7 +226,6 @@ export class SeedRunner {
         stats.openPrsBefore = allOpenPrs.length;
         console.log(`   Found ${allOpenPrs.length} open PRs, targeting ${targetCount} for completion\n`);
 
-        // Process oldest PRs first
         const primaryUser = this.config.resolvedUsers[0];
 
         for (const { project, repoId, remoteUrl, pr } of allOpenPrs) {
@@ -231,22 +235,18 @@ export class SeedRunner {
             const prTitle = pr.title.length > 50 ? pr.title.slice(0, 47) + '...' : pr.title;
 
             try {
-                // Check if it's a draft and publish it
                 if ((pr as any).isDraft) {
                     console.log(`   📝 Publishing draft PR #${pr.pullRequestId}: ${prTitle}`);
                     await this.prManager.publishDraft(project, repoId, pr.pullRequestId);
                     stats.draftsPublished++;
-                    // Note: After publishing, we'll complete it on the next cleanup run
                     continue;
                 }
 
-                // Extract source branch from refs/heads/<branch>
                 const sourceBranch = pr.sourceRefName.replace('refs/heads/', '');
                 const targetBranch = pr.targetRefName.replace('refs/heads/', '');
 
                 console.log(`   ✅ Completing PR #${pr.pullRequestId}: ${prTitle}`);
 
-                // Use conflict resolution helper for robust completion
                 const completed = await this.completePrWithConflictResolution(
                     project,
                     repoId,
@@ -257,11 +257,8 @@ export class SeedRunner {
                     targetBranch
                 );
 
-                if (completed) {
-                    stats.prsCompleted++;
-                } else {
-                    stats.prsFailed++;
-                }
+                if (completed) stats.prsCompleted++;
+                else stats.prsFailed++;
             } catch (error) {
                 const errorMsg = error instanceof Error ? error.message : String(error);
                 console.log(`   ❌ Failed PR #${pr.pullRequestId}: ${errorMsg}`);
@@ -332,32 +329,20 @@ export class SeedRunner {
         };
 
         try {
-            // Create/ensure repo exists
             const repoResult = await this.repoManager.ensureRepo(
                 planned.project,
                 planned.repoName,
                 this.config.repoStrategy
             );
-            if (!repoResult) {
-                // Skipped or recorded warning elsewhere (though RepoResult needs to show it)
-                return result;
-            }
+            if (!repoResult) return result;
+
             const { repo, isNew } = repoResult;
             result.repoId = repo.id;
 
-            // Generate and push git content (FATAL on failure)
             const branchSpecs: BranchSpec[] = planned.branches.map((b) => ({
                 name: b.name,
                 commits: b.commits,
             }));
-
-            // Step 2.5: Collision Guard (Fatal if any branch exists)
-            // For now, we'll check via remote URL (simplest without cloning)
-            // Actually, we'll just check if the branch exists on the remote later or now
-            // But let's follow the plan: FATAL if collision
-            // We can use git ls-remote to check for branches without cloning
-            // But wait, the plan says: "Rerun Day2 with the SAME runId. Assert FATAL exit."
-            // I'll implement this check in a simpler way if possible or just use git.
 
             const generated = await this.gitGenerator.createRepo(
                 planned.repoName,
@@ -369,7 +354,6 @@ export class SeedRunner {
             try {
                 const primaryUser = this.config.resolvedUsers[0];
 
-                // Step 2.5: Collision Guard (Fatal if any branch exists)
                 const collisions = await this.gitGenerator.checkCollisions(
                     repo.remoteUrl,
                     primaryUser.pat,
@@ -382,30 +366,24 @@ export class SeedRunner {
                     );
                 }
 
-                // Skip pushing main for existing repos (accumulation mode)
-                // New repos need main pushed; existing repos already have main
                 await this.gitGenerator.pushToRemote(
                     generated.localPath,
                     repo.remoteUrl,
                     primaryUser.pat,
                     generated.branches,
-                    !isNew // skipMainPush = true for existing repos
+                    !isNew
                 );
                 result.branchesCreated = generated.branches.length;
 
-                // Process PRs (NON-FATAL on individual failures)
-                // MUST happen inside try block to keep localPath alive for follow-up pushes
                 for (const plannedPr of planned.prs) {
                     const prResult = await this.processPr(
                         planned.project,
-                        repo, // Use repo object for remoteUrl access
+                        repo,
                         plannedPr,
                         result.failures,
-                        generated.localPath // Pass localPath for follow-up push
+                        generated.localPath
                     );
-                    if (prResult) {
-                        result.prs.push(prResult);
-                    }
+                    if (prResult) result.prs.push(prResult);
                 }
             } finally {
                 generated.cleanup();
@@ -418,10 +396,7 @@ export class SeedRunner {
                 isFatal: true,
             });
 
-            // Re-throw if it's a FATAL error intended to stop the whole run
-            if (errorMsg.includes('FATAL:')) {
-                throw error;
-            }
+            if (errorMsg.includes('FATAL:')) throw error;
         }
 
         return result;
@@ -436,8 +411,8 @@ export class SeedRunner {
     ): Promise<PrResult | null> {
         const repoId = repo.id;
         const repoName = repo.name;
+
         try {
-            // Create PR
             const pr = await this.prManager.createPr({
                 project,
                 repoId,
@@ -459,14 +434,12 @@ export class SeedRunner {
                 outcomeApplied: false,
             };
 
-            // Publish draft if planned (90% of drafts get published before operations)
             let effectivelyDraft = planned.isDraft;
             if (planned.isDraft && planned.shouldPublishDraft) {
                 try {
                     await this.prManager.publishDraft(project, repoId, pr.pullRequestId);
-                    effectivelyDraft = false; // Now it's a regular PR
+                    effectivelyDraft = false;
                 } catch (error) {
-                    // Publish failed - treat as lingering draft
                     failures.push({
                         phase: 'publish-draft',
                         prId: pr.pullRequestId,
@@ -476,7 +449,6 @@ export class SeedRunner {
                 }
             }
 
-            // Add reviewers (non-fatal) - skip for drafts since ADO rejects voting on drafts
             if (!effectivelyDraft) {
                 for (const reviewer of planned.reviewers) {
                     try {
@@ -489,7 +461,6 @@ export class SeedRunner {
                                 reviewerId: user.identityId,
                             });
 
-                            // Cast vote using reviewer's client
                             const reviewerClient = this.userClients.get(reviewer.email);
                             if (reviewerClient) {
                                 const reviewerPrManager = new PrManager(reviewerClient);
@@ -505,7 +476,6 @@ export class SeedRunner {
                             prResult.reviewers.push({ email: reviewer.email, vote: reviewer.vote });
                         }
                     } catch (error) {
-                        // Capture detailed ADO error response when available
                         const adoData = (error as { data?: unknown })?.data;
                         const errorDetail = adoData ? ` - ${JSON.stringify(adoData)}` : '';
                         failures.push({
@@ -518,7 +488,6 @@ export class SeedRunner {
                 }
             }
 
-            // Add comments (non-fatal)
             for (const comment of planned.comments) {
                 try {
                     const commenterClient = this.userClients.get(comment.authorEmail);
@@ -542,13 +511,10 @@ export class SeedRunner {
                 }
             }
 
-            // Apply outcome (non-fatal) - skip for drafts since they can't be completed/abandoned
             try {
                 if (effectivelyDraft) {
-                    // Draft PRs cannot be completed or abandoned - leave them as-is
-                    prResult.outcomeApplied = true; // Skip counts as "applied" for drafts
+                    prResult.outcomeApplied = true;
                 } else if (planned.outcome === 'complete') {
-                    // Robust completion with conflict auto-resolution and retry for 409
                     const primaryUser = this.config.resolvedUsers[0];
                     const completed = await this.completePrWithConflictResolution(
                         project,
@@ -571,7 +537,7 @@ export class SeedRunner {
                     await this.prManager.abandonPr(project, repoId, pr.pullRequestId);
                     prResult.outcomeApplied = true;
                 } else {
-                    prResult.outcomeApplied = true; // leaveOpen is the default
+                    prResult.outcomeApplied = true;
                 }
             } catch (error) {
                 failures.push({
@@ -582,7 +548,6 @@ export class SeedRunner {
                 });
             }
 
-            // Push follow-up commits if planned (non-fatal)
             if (planned.followUpCommits > 0 && localPath) {
                 try {
                     const primaryUser = this.config.resolvedUsers[0];
@@ -620,9 +585,6 @@ export class SeedRunner {
 
     /**
      * Waits for ADO to evaluate merge status (not 'notSet' or 'queued').
-     * Polls with exponential backoff up to maxWaitMs.
-     *
-     * @returns PR details with evaluated merge status, or null if timeout
      */
     private async waitForMergeStatusEvaluation(
         project: string,
@@ -635,9 +597,8 @@ export class SeedRunner {
 
         while (Date.now() - startTime < maxWaitMs) {
             const prDetails = await this.prManager.getPrDetails(project, repoId, prId);
-
-            // Check if merge status has been evaluated (not pending)
             const status = prDetails.mergeStatus;
+
             if (status && status !== 'notSet' && status !== 'queued') {
                 return prDetails;
             }
@@ -652,8 +613,6 @@ export class SeedRunner {
 
     /**
      * Waits for ADO to report mergeStatus as 'succeeded' after updates.
-     *
-     * @returns PR details with mergeStatus 'succeeded', or null if timeout
      */
     private async waitForMergeStatusSuccess(
         project: string,
@@ -685,8 +644,6 @@ export class SeedRunner {
 
     /**
      * Waits for ADO to mark the PR as completed after a completion request.
-     *
-     * @returns true when status is 'completed', false on timeout
      */
     private async waitForCompletion(
         project: string,
@@ -699,9 +656,7 @@ export class SeedRunner {
 
         while (Date.now() - startTime < maxWaitMs) {
             const prDetails = await this.prManager.getPrDetails(project, repoId, prId);
-            if (prDetails.status === 'completed') {
-                return true;
-            }
+            if (prDetails.status === 'completed') return true;
             console.log(`   ⏳ PR #${prId} status is '${prDetails.status}', waiting for completion...`);
             await new Promise((r) => setTimeout(r, pollIntervalMs));
         }
@@ -713,18 +668,9 @@ export class SeedRunner {
     /**
      * Attempts to complete a PR with automatic conflict resolution.
      *
-     * IMPORTANT: Only resolves conflicts when mergeStatus is explicitly 'conflicts'.
-     * For other statuses (notSet, queued, undefined), we try completion directly -
-     * ADO will reject if not ready, and we'll retry. This avoids unnecessary
-     * force-pushes that invalidate ADO's merge evaluation.
-     *
-     * Flow:
-     * 1. Get PR details (with short wait for evaluation if needed)
-     * 2. If mergeStatus is 'conflicts' or 'failure', resolve by merging target into source
-     * 3. Try completion with bypassPolicy enabled
-     * 4. On failure, retry with backoff
-     *
-     * @returns true if PR was completed successfully
+     * Key hardening:
+     * - Push verification uses remote branch ref (git ls-remote) NOT PR lastMergeSourceCommit (which can lag).
+     * - TF401192 stale: refetch PR + retry completion; DO NOT re-resolve (which creates new commits and loops staleness).
      */
     private async completePrWithConflictResolution(
         project: string,
@@ -736,40 +682,31 @@ export class SeedRunner {
         targetBranch: string = 'main'
     ): Promise<boolean> {
         const maxRetries = 3;
-        let conflictResolutionAttempted = false;
+
+        // Track whether we have already pushed a resolution commit for this PR in this call
+        let resolutionPushedSha: string | undefined;
 
         for (let attempt = 0; attempt < maxRetries; attempt++) {
             try {
-                // Step 1: Get PR details, with a short wait for merge status if this is first attempt
+                // Always start each attempt from fresh PR details (commitId can change between attempts)
                 let prDetails = await this.prManager.getPrDetails(project, repoId, prId);
 
-                // On first attempt, give ADO a moment to evaluate merge status if it's pending
+                // On first attempt, give ADO a moment to evaluate merge status if pending
                 if (
                     attempt === 0 &&
                     (!prDetails.mergeStatus || prDetails.mergeStatus === 'notSet' || prDetails.mergeStatus === 'queued')
                 ) {
                     const evaluated = await this.waitForMergeStatusEvaluation(project, repoId, prId, 10000);
-                    if (evaluated) {
-                        prDetails = evaluated;
-                    }
+                    if (evaluated) prDetails = evaluated;
                 }
 
                 const mergeStatus = prDetails.mergeStatus;
 
-                // Step 2: ONLY resolve conflicts when explicitly reported as 'conflicts' or 'failure'
-                // Do NOT resolve for: notSet, queued, undefined, succeeded
-                // This prevents unnecessary force-pushes that break the completion flow
-                const needsResolution =
-                    (mergeStatus === 'conflicts' || mergeStatus === 'failure') && !conflictResolutionAttempted;
-
-                if (needsResolution) {
+                // Resolve ONLY if ADO explicitly says conflicts/failure AND we have not already pushed a resolution SHA
+                if ((mergeStatus === 'conflicts' || mergeStatus === 'failure') && !resolutionPushedSha) {
                     const statusLabel = mergeStatus ?? 'unknown';
                     console.log(`   ⚠️  PR #${prId} merge status is '${statusLabel}', auto-resolving...`);
 
-                    // Capture source commit before resolution to verify push succeeded
-                    const commitIdBeforeResolution = prDetails.lastMergeSourceCommit?.commitId;
-
-                    // Resolve conflicts by merging target into source with -X ours
                     const resolution = await this.gitGenerator.resolveConflicts(
                         remoteUrl,
                         pat,
@@ -777,42 +714,37 @@ export class SeedRunner {
                         targetBranch
                     );
 
-                    if (!resolution.resolved) {
-                        console.log(`   ❌ Conflict resolution failed for PR #${prId}: ${resolution.error}`);
-                        // Don't set conflictResolutionAttempted - allow retry on next attempt
-                        // This handles transient failures (network errors, etc.)
-                        // Continue to try completion anyway - bypassPolicy might help
+                    if (!resolution.resolved || !resolution.newCommitSha) {
+                        console.log(
+                            `   ❌ Conflict resolution failed for PR #${prId}: ${resolution.error ?? 'unknown'}`
+                        );
+                        // Continue: bypassPolicy completion might still work, or next attempt may succeed.
                     } else {
-                        console.log(`   ✅ Conflicts resolved for PR #${prId}, verifying push...`);
+                        console.log(`   ✅ Conflicts resolved for PR #${prId}, verifying remote ref moved...`);
 
-                        // Wait for ADO to re-evaluate merge status after our push
+                        // Verify remote branch ref actually moved to the new commit SHA (strong signal)
+                        const remoteHead = await this.getRemoteBranchHeadSha(remoteUrl, pat, sourceBranch);
+                        if (remoteHead && remoteHead.toLowerCase() === resolution.newCommitSha.toLowerCase()) {
+                            resolutionPushedSha = resolution.newCommitSha;
+                            console.log(`   ✅ PR #${prId} remote ref updated: ${remoteHead.slice(0, 7)}`);
+                        } else {
+                            console.log(
+                                `   ❌ PR #${prId} remote ref did not move to expected SHA (expected=${resolution.newCommitSha.slice(
+                                    0,
+                                    7
+                                )} got=${remoteHead?.slice(0, 7) ?? 'unknown'}).`
+                            );
+                            // Don't set resolutionPushedSha; allow retry to attempt resolution again.
+                        }
+
+                        // Give ADO a short window to re-evaluate merge status after ref update (best-effort)
                         const refreshed = await this.waitForMergeStatusEvaluation(project, repoId, prId, 15000);
-                        if (refreshed) {
-                            prDetails = refreshed;
-                        } else {
-                            // Timeout - get latest details and continue
-                            prDetails = await this.prManager.getPrDetails(project, repoId, prId);
-                        }
-
-                        // Verify force-push actually updated the PR source branch
-                        const commitIdAfterResolution = prDetails.lastMergeSourceCommit?.commitId;
-                        if (commitIdBeforeResolution && commitIdAfterResolution === commitIdBeforeResolution) {
-                            console.log(
-                                `   ❌ PR #${prId} source commit unchanged after resolution (${commitIdBeforeResolution?.slice(0, 7)}). Force-push may have failed.`
-                            );
-                            // Don't mark as attempted - allow retry
-                        } else {
-                            console.log(
-                                `   ✅ PR #${prId} source commit updated: ${commitIdBeforeResolution?.slice(0, 7) ?? 'none'} → ${commitIdAfterResolution?.slice(0, 7) ?? 'none'}`
-                            );
-                            // Only mark as attempted when resolution AND push verified
-                            conflictResolutionAttempted = true;
-                        }
+                        if (refreshed) prDetails = refreshed;
+                        else prDetails = await this.prManager.getPrDetails(project, repoId, prId);
                     }
                 }
 
-                // Step 2.5: Wait for merge status to succeed, but don't fail if it doesn't
-                // bypassPolicy: true may allow completion even if mergeStatus isn't 'succeeded'
+                // Best-effort wait for mergeStatus to succeed; do not hard-fail if it doesn't
                 if (prDetails.mergeStatus !== 'succeeded') {
                     console.log(
                         `   ⏳ PR #${prId} mergeStatus is '${prDetails.mergeStatus ?? 'undefined'}', waiting up to 60s for success...`
@@ -822,18 +754,17 @@ export class SeedRunner {
                         prDetails = successDetails;
                         console.log(`   ✅ PR #${prId} mergeStatus reached 'succeeded'`);
                     } else {
-                        // HARDENING: Don't return false here - attempt completion anyway with bypassPolicy
                         console.log(
                             `   ⚠️  PR #${prId} mergeStatus did not reach 'succeeded', attempting completion with bypassPolicy...`
                         );
                     }
                 }
 
-                // Step 3: Complete the PR
+                // IMPORTANT: refetch PR details just before completion to avoid stale commitId
+                prDetails = await this.prManager.getPrDetails(project, repoId, prId);
+
                 const commitId = prDetails.lastMergeSourceCommit?.commitId;
                 if (!commitId) {
-                    // If commitId is missing, ADO likely hasn't evaluated yet
-                    // Throw to trigger retry with backoff rather than sending empty commitId
                     console.log(
                         `   ⏳ PR #${prId} missing lastMergeSourceCommit.commitId (mergeStatus: ${prDetails.mergeStatus ?? 'undefined'}), will retry...`
                     );
@@ -844,7 +775,10 @@ export class SeedRunner {
                 }
 
                 console.log(
-                    `   🚀 PR #${prId} attempting completion (commitId: ${commitId.slice(0, 7)}, mergeStatus: ${prDetails.mergeStatus ?? 'undefined'})`
+                    `   🚀 PR #${prId} attempting completion (commitId: ${commitId.slice(
+                        0,
+                        7
+                    )}, mergeStatus: ${prDetails.mergeStatus ?? 'undefined'})`
                 );
 
                 await this.prManager.completePr(project, repoId, prId, commitId, {
@@ -860,30 +794,33 @@ export class SeedRunner {
                 console.log(`   ✅ PR #${prId} successfully completed and verified`);
                 return true;
             } catch (error: any) {
-                const isRetryable = error.status === 409 || error.status === 400;
                 const adoData = error?.response?.data ?? error?.data;
                 const isStaleException = adoData?.typeKey === 'GitPullRequestStaleException';
+                const statusCode = error?.status ?? error?.response?.status;
 
-                // Handle TF401192 stale exception - source branch was modified
+                // TF401192: source modified since last merge attempt.
+                // Fix: refetch PR and retry completion; DO NOT resolve again (that creates more commits and loops staleness).
                 if (isStaleException && attempt < maxRetries - 1) {
-                    console.log(`   🔄 PR #${prId} stale (TF401192: source modified), re-fetching fresh PR details...`);
-                    // Reset conflict resolution flag to allow fresh resolution on retry
-                    conflictResolutionAttempted = false;
-                    await new Promise((r) => setTimeout(r, 2000));
+                    console.log(
+                        `   🔄 PR #${prId} stale (TF401192: source modified), refetching and retrying completion...`
+                    );
+                    await new Promise((r) => setTimeout(r, 1500));
                     continue;
                 }
 
-                // Retry on 409 (Conflict) or 400 (Bad Request) - usually means PR is being updated or not ready
+                // Retry on 409/400 which often mean "not ready"
+                const isRetryable = statusCode === 409 || statusCode === 400;
                 if (isRetryable && attempt < maxRetries - 1) {
                     const waitTime = 2000 * (attempt + 1);
                     console.log(
-                        `   🔄 PR #${prId} not ready (${error.status}), retrying in ${waitTime / 1000}s (attempt ${attempt + 2}/${maxRetries})...`
+                        `   🔄 PR #${prId} not ready (${statusCode}), retrying in ${waitTime / 1000}s (attempt ${
+                            attempt + 2
+                        }/${maxRetries})...`
                     );
                     await new Promise((r) => setTimeout(r, waitTime));
                     continue;
                 }
 
-                // Log detailed error including ADO response data to distinguish permission, policy, and timing failures
                 const adoMessage = adoData ? ` ADO response: ${JSON.stringify(adoData)}` : '';
                 console.log(
                     `   ❌ Failed to complete PR #${prId}: ${error instanceof Error ? error.message : String(error)}${adoMessage}`
@@ -893,5 +830,65 @@ export class SeedRunner {
         }
 
         return false;
+    }
+
+    /**
+     * Reads the remote head SHA for refs/heads/<branch> using git ls-remote with ASKPASS auth.
+     * This is the reliable push-verification signal (PR lastMergeSourceCommit may lag).
+     */
+    private async getRemoteBranchHeadSha(remoteUrl: string, pat: string, branch: string): Promise<string | null> {
+        const url = new URL(remoteUrl);
+        url.username = 'seeder';
+        url.password = '';
+        const cleanUrl = url.toString();
+
+        const askPass = this.createAskPassScript(pat);
+
+        try {
+            const env: NodeJS.ProcessEnv = {
+                GIT_ASKPASS: askPass.path,
+                GIT_TERMINAL_PROMPT: '0',
+            };
+
+            const ref = `refs/heads/${branch}`;
+            const result = await exec('git', ['ls-remote', '--heads', cleanUrl, ref], {
+                cwd: tmpdir(),
+                env,
+                patsToRedact: this.allPats,
+            });
+
+            if (result.code !== 0) {
+                return null;
+            }
+
+            const line = result.stdout.trim();
+            if (!line) return null;
+
+            // "<sha>\t<ref>"
+            const sha = line.split(/\s+/)[0];
+            return sha || null;
+        } finally {
+            askPass.cleanup();
+        }
+    }
+
+    private createAskPassScript(pat: string): { path: string; cleanup: () => void } {
+        const isWindows = process.platform === 'win32';
+        const scriptExt = isWindows ? '.bat' : '.sh';
+        const scriptPath = join(tmpdir(), `askpass-${Math.random().toString(36).slice(2)}${scriptExt}`);
+
+        const content = isWindows ? `@echo ${pat}` : `#!/bin/sh\necho "${pat}"`;
+
+        writeFileSync(scriptPath, content);
+        if (!isWindows) chmodSync(scriptPath, 0o700);
+
+        return {
+            path: scriptPath,
+            cleanup: () => {
+                try {
+                    rmSync(scriptPath, { force: true });
+                } catch {}
+            },
+        };
     }
 }
