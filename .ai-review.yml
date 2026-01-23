@@ -23,8 +23,8 @@ passes:
   #   enabled: true
   #   required: false # Skip if Ollama unavailable
 
-# models:
-#   default: codellama:7b # Or: deepseek-coder:6.7b, llama3.2:3b
+models:
+   default: claude-sonnet-4-20250514 # Or: deepseek-coder:6.7b, llama3.2:3b, codellama:7b
 
 limits:
   max_files: 150
