@@ -23,15 +23,15 @@ passes:
   #   enabled: true
   #   required: false # Skip if Ollama unavailable
 
+models:
+  default: codellama:7b # Or: deepseek-coder:6.7b, llama3.2:3b
+
 limits:
   max_files: 150
   max_diff_lines: 100000
   max_tokens_per_pr: 700000
-  max_usd_per_pr: 50.00 # Free with local LLM!
-  monthly_budget_usd: 500 # Free with local LLM!
-
-models:
-  default: codellama:7b # Or: deepseek-coder:6.7b, llama3.2:3b
+  max_usd_per_pr: 50.00
+  monthly_budget_usd: 500
 
 reporting:
   github:
