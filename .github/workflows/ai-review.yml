@@ -23,7 +23,7 @@ jobs:
       runs_on: '["self-hosted", "linux"]'
       # runs_on: '["ubuntu-latest"]' if default and not needed but here to be explicit
 
-    secrets:
+    #secrets:
       # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       # Optional w/ OSCR:
