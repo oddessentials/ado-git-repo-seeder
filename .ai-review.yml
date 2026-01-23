@@ -1,0 +1,44 @@
+version: 1
+trusted_only: true
+
+triggers:
+  on: [pull_request]
+  branches: [main]
+
+# Static analysis only - no API keys required
+passes:
+  - name: static
+    agents: [semgrep, reviewdog] # Both free!
+    enabled: true
+    required: true # Fail the check if semgrep finds issues
+
+# AI review - if running sidecar
+  - name: local-ai
+    agents: [local_llm]
+    enabled: true
+    required: false # Skip if Ollama unavailable
+
+limits:
+  max_files: 150
+  max_diff_lines: 100000
+  max_tokens_per_pr: 700000
+  max_usd_per_pr: 0.00 # Free with local LLM!
+  monthly_budget_usd: 0 # Free with local LLM!
+
+models:
+  default: codellama:7b # Or: deepseek-coder:6.7b, llama3.2:3b
+
+reporting:
+  github:
+    mode: checks_and_comments # Both check annotations and PR comments
+    max_inline_comments: 20 # Limit comment spam
+    summary: true # Post summary comment
+  # ado:
+  #   mode: threads_and_status
+  #   max_inline_comments: 50
+  #   summary: true
+  #   thread_status: active
+
+gating:
+  enabled: false # Set to true to block merging on errors
+  fail_on_severity: error # Only block on errors, not warnings
