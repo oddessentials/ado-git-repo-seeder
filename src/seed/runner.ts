@@ -861,6 +861,17 @@ export class SeedRunner {
                 return true;
             } catch (error: any) {
                 const isRetryable = error.status === 409 || error.status === 400;
+                const adoData = error?.response?.data ?? error?.data;
+                const isStaleException = adoData?.typeKey === 'GitPullRequestStaleException';
+
+                // Handle TF401192 stale exception - source branch was modified
+                if (isStaleException && attempt < maxRetries - 1) {
+                    console.log(`   🔄 PR #${prId} stale (TF401192: source modified), re-fetching fresh PR details...`);
+                    // Reset conflict resolution flag to allow fresh resolution on retry
+                    conflictResolutionAttempted = false;
+                    await new Promise((r) => setTimeout(r, 2000));
+                    continue;
+                }
 
                 // Retry on 409 (Conflict) or 400 (Bad Request) - usually means PR is being updated or not ready
                 if (isRetryable && attempt < maxRetries - 1) {
@@ -873,7 +884,6 @@ export class SeedRunner {
                 }
 
                 // Log detailed error including ADO response data to distinguish permission, policy, and timing failures
-                const adoData = error?.response?.data ?? error?.data;
                 const adoMessage = adoData ? ` ADO response: ${JSON.stringify(adoData)}` : '';
                 console.log(
                     `   ❌ Failed to complete PR #${prId}: ${error instanceof Error ? error.message : String(error)}${adoMessage}`
