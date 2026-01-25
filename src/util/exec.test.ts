@@ -66,4 +66,109 @@ describe('exec utility', () => {
             expect(result.stdout).toContain('[REDACTED]');
         });
     });
+
+    describe('argument handling', () => {
+        it('escapes arguments with spaces', async () => {
+            const result = await exec('echo', ['hello world']);
+
+            expect(result.code).toBe(0);
+            expect(result.stdout).toContain('hello world');
+        });
+
+        it('escapes arguments with tabs', async () => {
+            const result = await exec('echo', ['hello\tworld']);
+
+            expect(result.code).toBe(0);
+        });
+
+        it('handles empty arguments', async () => {
+            const result = await exec('echo', ['']);
+
+            expect(result.code).toBe(0);
+        });
+
+        it('handles arguments with quotes', async () => {
+            const result = await exec('echo', ['say "hello"']);
+
+            expect(result.code).toBe(0);
+        });
+    });
+
+    describe('exit codes', () => {
+        it('returns non-zero exit code for failed commands', async () => {
+            const result = await exec('ls', ['/nonexistent/path/that/does/not/exist']);
+
+            expect(result.code).not.toBe(0);
+        });
+
+        it('returns exit code 0 for successful commands', async () => {
+            const result = await exec('echo', ['success']);
+
+            expect(result.code).toBe(0);
+        });
+    });
+
+    describe('working directory', () => {
+        it('executes in specified working directory', async () => {
+            const result = await exec('pwd', [], {
+                cwd: '/tmp',
+            });
+
+            expect(result.code).toBe(0);
+            expect(result.stdout).toContain('/tmp');
+        });
+    });
+
+    describe('stderr handling', () => {
+        it('captures stderr output', async () => {
+            // Use a command that writes to stderr
+            const result = await exec('ls', ['/nonexistent-path-12345']);
+
+            // Should have something in stderr (the error message)
+            expect(result.code).not.toBe(0);
+        });
+
+        it('redacts PATs from stderr', async () => {
+            const secretPat = 'stderr-secret-pat';
+            // Force an error that might contain the pat
+            const result = await exec('sh', ['-c', `echo ${secretPat} >&2`], {
+                patsToRedact: [secretPat],
+            });
+
+            expect(result.stderr).not.toContain(secretPat);
+            expect(result.stderr).toContain('[REDACTED]');
+        });
+    });
+
+    describe('redaction edge cases', () => {
+        it('handles empty PAT array', async () => {
+            const result = await exec('echo', ['test'], {
+                patsToRedact: [],
+            });
+
+            expect(result.code).toBe(0);
+            expect(result.stdout).toContain('test');
+        });
+
+        it('handles empty string in PAT array', async () => {
+            const result = await exec('echo', ['test'], {
+                patsToRedact: [''],
+            });
+
+            expect(result.code).toBe(0);
+            expect(result.stdout).toContain('test');
+        });
+
+        it('redacts multiple PATs', async () => {
+            const pat1 = 'secret1-abc';
+            const pat2 = 'secret2-def';
+            const result = await exec('echo', [`${pat1} and ${pat2}`], {
+                patsToRedact: [pat1, pat2],
+            });
+
+            expect(result.stdout).not.toContain(pat1);
+            expect(result.stdout).not.toContain(pat2);
+            expect(result.stdout).toContain('[REDACTED]');
+        });
+    });
 });

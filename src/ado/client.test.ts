@@ -125,4 +125,191 @@ describe('ADO Client Factory', () => {
             expect(mockClient.interceptors.response.use).toHaveBeenCalledTimes(1);
         });
     });
+
+    describe('Interceptor behavior', () => {
+        it('request interceptor marks Authorization header as redacted', () => {
+            let requestInterceptor: ((config: any) => any) | null = null;
+            const mockClient = {
+                interceptors: {
+                    request: {
+                        use: vi.fn((fn) => {
+                            requestInterceptor = fn;
+                        }),
+                    },
+                    response: { use: vi.fn() },
+                },
+            };
+            vi.mocked(axios.create).mockReturnValue(mockClient as any);
+
+            createAdoClient({ org: 'org', pat: 'secret-pat', allPats: ['secret-pat'] });
+
+            expect(requestInterceptor).not.toBeNull();
+
+            // Test the interceptor
+            const config = { headers: { Authorization: 'Basic xyz' } };
+            const result = requestInterceptor!(config);
+            expect(result._redactedAuth).toBe(true);
+        });
+
+        it('request interceptor handles missing Authorization header', () => {
+            let requestInterceptor: ((config: any) => any) | null = null;
+            const mockClient = {
+                interceptors: {
+                    request: {
+                        use: vi.fn((fn) => {
+                            requestInterceptor = fn;
+                        }),
+                    },
+                    response: { use: vi.fn() },
+                },
+            };
+            vi.mocked(axios.create).mockReturnValue(mockClient as any);
+
+            createAdoClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
+
+            // Test with no Authorization header
+            const config = { headers: {} };
+            const result = requestInterceptor!(config);
+            expect(result._redactedAuth).toBeUndefined();
+        });
+
+        it('response interceptor passes successful responses through', async () => {
+            let responseInterceptor: { success: (r: any) => any; error: (e: any) => any } | null = null;
+            const mockClient = {
+                interceptors: {
+                    request: { use: vi.fn() },
+                    response: {
+                        use: vi.fn((success, error) => {
+                            responseInterceptor = { success, error };
+                        }),
+                    },
+                },
+            };
+            vi.mocked(axios.create).mockReturnValue(mockClient as any);
+
+            createAdoClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
+
+            const mockResponse = { data: { value: 'test' }, status: 200 };
+            const result = responseInterceptor!.success(mockResponse);
+            expect(result).toEqual(mockResponse);
+        });
+
+        it('response interceptor sanitizes errors and redacts PAT', async () => {
+            let responseInterceptor: { success: (r: any) => any; error: (e: any) => Promise<any> } | null = null;
+            const mockClient = {
+                interceptors: {
+                    request: { use: vi.fn() },
+                    response: {
+                        use: vi.fn((success, error) => {
+                            responseInterceptor = { success, error };
+                        }),
+                    },
+                },
+            };
+            vi.mocked(axios.create).mockReturnValue(mockClient as any);
+
+            const secretPat = 'super-secret-pat-12345';
+            createAdoClient({ org: 'org', pat: secretPat, allPats: [secretPat] });
+
+            // Error without config (no retry possible)
+            const errorWithoutConfig = {
+                message: `Failed to authenticate with ${secretPat}`,
+                response: { status: 401 },
+            };
+
+            await expect(responseInterceptor!.error(errorWithoutConfig)).rejects.toMatchObject({
+                name: 'AdoApiError',
+                message: expect.not.stringContaining(secretPat),
+            });
+        });
+
+        it('response interceptor throws sanitized error for 4xx errors (non-retryable)', async () => {
+            let responseInterceptor: { success: (r: any) => any; error: (e: any) => Promise<any> } | null = null;
+            const mockClient = {
+                interceptors: {
+                    request: { use: vi.fn() },
+                    response: {
+                        use: vi.fn((success, error) => {
+                            responseInterceptor = { success, error };
+                        }),
+                    },
+                },
+            };
+            vi.mocked(axios.create).mockReturnValue(mockClient as any);
+
+            createAdoClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
+
+            // 403 Forbidden - should not retry
+            const forbiddenError = {
+                config: { _retryCount: 0 },
+                message: 'Forbidden',
+                response: { status: 403, data: { message: 'Access denied' } },
+            };
+
+            await expect(responseInterceptor!.error(forbiddenError)).rejects.toMatchObject({
+                name: 'AdoApiError',
+                status: 403,
+            });
+        });
+
+        it('response interceptor includes response data in sanitized error', async () => {
+            let responseInterceptor: { success: (r: any) => any; error: (e: any) => Promise<any> } | null = null;
+            const mockClient = {
+                interceptors: {
+                    request: { use: vi.fn() },
+                    response: {
+                        use: vi.fn((success, error) => {
+                            responseInterceptor = { success, error };
+                        }),
+                    },
+                },
+            };
+            vi.mocked(axios.create).mockReturnValue(mockClient as any);
+
+            createAdoClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
+
+            const errorWithData = {
+                config: {},
+                message: 'Not found',
+                response: {
+                    status: 404,
+                    data: { typeKey: 'GitRepositoryNotFoundError' },
+                },
+            };
+
+            await expect(responseInterceptor!.error(errorWithData)).rejects.toMatchObject({
+                data: { typeKey: 'GitRepositoryNotFoundError' },
+            });
+        });
+    });
+
+    describe('Identity client interceptors', () => {
+        it('response interceptor sanitizes errors for identity client', async () => {
+            let responseInterceptor: { success: (r: any) => any; error: (e: any) => Promise<any> } | null = null;
+            const mockClient = {
+                interceptors: {
+                    request: { use: vi.fn() },
+                    response: {
+                        use: vi.fn((success, error) => {
+                            responseInterceptor = { success, error };
+                        }),
+                    },
+                },
+            };
+            vi.mocked(axios.create).mockReturnValue(mockClient as any);
+
+            const secretPat = 'identity-secret-pat';
+            createIdentityClient({ org: 'org', pat: secretPat, allPats: [secretPat] });
+
+            const errorWithPat = {
+                message: `Identity lookup failed with ${secretPat}`,
+                response: { status: 400 },
+            };
+
+            await expect(responseInterceptor!.error(errorWithPat)).rejects.toMatchObject({
+                name: 'AdoApiError',
+                message: expect.not.stringContaining(secretPat),
+            });
+        });
+    });
 });

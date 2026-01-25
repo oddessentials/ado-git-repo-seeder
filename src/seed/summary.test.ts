@@ -1,6 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { generateMarkdownSummary } from './summary.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { generateMarkdownSummary, writeSummary, printSummary } from './summary.js';
 import type { SeedSummary } from './summary.js';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 describe('summary', () => {
     describe('generateMarkdownSummary()', () => {
@@ -247,6 +250,134 @@ describe('summary', () => {
                 expect(md).toContain('identity-resolution');
                 expect(md).toContain('Failed to resolve user');
             });
+        });
+
+        it('includes follow-up commits when greater than zero', () => {
+            const summaryWithFollowUp: SeedSummary = {
+                ...baseSummary,
+                repos: [
+                    {
+                        project: 'proj',
+                        repoName: 'repo',
+                        repoId: 'rid',
+                        resolvedNaming: 'isolated',
+                        branchesCreated: 1,
+                        prs: [
+                            {
+                                prId: 99,
+                                title: 'PR with follow-ups',
+                                creator: 'dev@test.com',
+                                reviewers: [],
+                                comments: 0,
+                                outcome: 'complete',
+                                outcomeApplied: true,
+                                followUpCommitsAdded: 3,
+                            },
+                        ],
+                        failures: [],
+                    },
+                ],
+            };
+
+            const md = generateMarkdownSummary(summaryWithFollowUp);
+
+            expect(md).toContain('Follow-up Commits: 3');
+        });
+
+        it('handles repo with null repoId', () => {
+            const summaryWithNullRepoId: SeedSummary = {
+                ...baseSummary,
+                repos: [
+                    {
+                        project: 'proj',
+                        repoName: 'repo',
+                        repoId: null,
+                        resolvedNaming: 'isolated',
+                        branchesCreated: 0,
+                        prs: [],
+                        failures: [],
+                    },
+                ],
+            };
+
+            const md = generateMarkdownSummary(summaryWithNullRepoId);
+
+            expect(md).toContain('Repo ID:** N/A');
+        });
+    });
+
+    describe('writeSummary()', () => {
+        let tempDir: string;
+
+        beforeEach(() => {
+            tempDir = mkdtempSync(join(tmpdir(), 'summary-test-'));
+        });
+
+        afterEach(() => {
+            rmSync(tempDir, { recursive: true, force: true });
+        });
+
+        it('writes summary to JSON file', () => {
+            const summary: SeedSummary = {
+                version: '1.0.0',
+                runId: 'write-test',
+                org: 'test-org',
+                startTime: '2026-01-01T00:00:00Z',
+                endTime: '2026-01-01T00:01:00Z',
+                repos: [],
+                fatalFailure: null,
+            };
+
+            const outputPath = join(tempDir, 'summary.json');
+            writeSummary(summary, outputPath);
+
+            const content = readFileSync(outputPath, 'utf-8');
+            const parsed = JSON.parse(content);
+
+            expect(parsed.runId).toBe('write-test');
+            expect(parsed.version).toBe('1.0.0');
+        });
+
+        it('writes formatted JSON with indentation', () => {
+            const summary: SeedSummary = {
+                version: '1.0.0',
+                runId: 'formatted-test',
+                org: 'org',
+                startTime: '2026-01-01T00:00:00Z',
+                endTime: '2026-01-01T00:01:00Z',
+                repos: [],
+                fatalFailure: null,
+            };
+
+            const outputPath = join(tempDir, 'formatted.json');
+            writeSummary(summary, outputPath);
+
+            const content = readFileSync(outputPath, 'utf-8');
+            // Check for indentation (formatted JSON)
+            expect(content).toContain('\n  ');
+        });
+    });
+
+    describe('printSummary()', () => {
+        it('logs markdown summary to console', () => {
+            const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+            const summary: SeedSummary = {
+                version: '1.0.0',
+                runId: 'print-test',
+                org: 'test-org',
+                startTime: '2026-01-01T00:00:00Z',
+                endTime: '2026-01-01T00:01:00Z',
+                repos: [],
+                fatalFailure: null,
+            };
+
+            printSummary(summary);
+
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('print-test'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('test-org'));
+
+            consoleSpy.mockRestore();
         });
     });
 });

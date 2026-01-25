@@ -93,8 +93,42 @@ Path to the `seed.config.json` file (default: `./seed.config.json`).
 ### `--dry-run` (or `-d`)
 Generates the seeding plan and prints the summary without performing any Git or ADO operations.
 
+### `--output` <dir> (or `-o`)
+Output directory for summary files (default: current directory).
+
+### `--fixtures` <path> (or `-f`)
+Path to fixtures directory for content derivation. If not specified, the tool looks for a `fixtures` directory adjacent to the config file.
+
+### `--naming` <mode>
+Override global `repoNaming` strategy from the command line. Accepts `isolated` or `direct`.
+
 ### `--purge-stale`
 Cleans the temporary working directory (`<TMP>/ado-seeder`) before execution.
+
+### `--clear-cache`
+Clears the identity cache (`identities.cache.json`) before running, forcing fresh identity resolution.
+
+### `--date` <YYYY-MM-DD>
+Backdate git commits to the specified date (noon UTC). Only affects git commit timestamps; PR/comment/vote timestamps are server-assigned.
+
+### `--no-cleanup`
+Disables cleanup mode (see below). By default, cleanup mode is enabled.
+
+### `--cleanup-threshold` <n>
+Sets the open PR count threshold to trigger cleanup mode (default: 50).
+
+---
+
+## Cleanup Mode (Normative)
+
+When the number of open PRs in a repository exceeds the `--cleanup-threshold` (default: 50), the tool enters **cleanup mode**:
+
+1. **Draft PRs are published first** — Any draft PRs are converted to active PRs
+2. **PRs are completed by age** — Oldest PRs are prioritized for completion (squash merge)
+3. **No new PRs are created** — The run focuses on reducing open PR backlog
+
+> [!NOTE]
+> Cleanup mode prevents PR accumulation from overwhelming ADO. Use `--no-cleanup` to disable this behavior if you need to accumulate large numbers of open PRs.
 
 ---
 
@@ -138,9 +172,14 @@ Weighted probability for PR reviewer votes (sum should be 1.0):
 
 ### `prOutcomes` (object)
 Weighted probability for PR completion (sum should be 1.0):
-- `complete` (Squash or Merge)
+- `complete` (Squash merge with `bypassPolicy: true`)
 - `abandon`
 - `leaveOpen`
+
+### Draft PRs (Hardcoded Behavior)
+- **10% of PRs** are created as drafts
+- **90% of draft PRs** are published before reviewers are assigned and votes are cast
+- The remaining 10% of drafts stay as drafts (no reviewers, votes, or completion)
 
 ---
 

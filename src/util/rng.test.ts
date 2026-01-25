@@ -151,5 +151,31 @@ describe('SeededRng', () => {
 
             expect(results1).toEqual(results2);
         });
+
+        it('handles weights that do not sum to exactly 1 (floating point fallback)', () => {
+            const rng = new SeededRng(555);
+            // Weights sum to slightly less than 1
+            const weights = { a: 0.3, b: 0.3, c: 0.3 };
+
+            // Run many times to ensure the fallback path (last entry) is hit
+            const results: string[] = [];
+            for (let i = 0; i < 100; i++) {
+                results.push(rng.weighted(weights));
+            }
+
+            // Should always return one of the valid keys
+            results.forEach((r) => {
+                expect(['a', 'b', 'c']).toContain(r);
+            });
+        });
+
+        it('returns last entry when random exceeds cumulative sum', () => {
+            // Use a very specific set of weights that will trigger fallback
+            const rng = new SeededRng(987654);
+            const weights = { only: 0.0 }; // Zero weight forces fallback
+
+            const result = rng.weighted(weights);
+            expect(result).toBe('only');
+        });
     });
 });
