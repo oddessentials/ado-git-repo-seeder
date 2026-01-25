@@ -5,12 +5,11 @@
  * (ComSpec, SYSTEMROOT) were being shadowed during child process spawning,
  * causing "spawn cmd.exe ENOENT" errors on Windows.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { exec } from './exec.js';
 
 describe('exec utility', () => {
     describe('Windows environment preservation', () => {
-        const originalPlatform = process.platform;
         const originalEnv = { ...process.env };
 
         afterEach(() => {
@@ -130,8 +129,9 @@ describe('exec utility', () => {
 
         it('redacts PATs from stderr', async () => {
             const secretPat = 'stderr-secret-pat';
-            // Force an error that might contain the pat
-            const result = await exec('sh', ['-c', `echo ${secretPat} >&2`], {
+            // Write to stderr via env var to avoid shell quoting issues
+            const result = await exec('sh', ['-c', 'printf "%s" "$SECRET_VAL" >&2'], {
+                env: { SECRET_VAL: secretPat },
                 patsToRedact: [secretPat],
             });
 
