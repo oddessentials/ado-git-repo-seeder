@@ -15,7 +15,7 @@ describe('Documentation Drift Guard', () => {
     const configDoc = readFileSync(configDocPath, 'utf-8');
 
     it('docs/configuration.md should mention all major SeedConfigSchema fields', () => {
-        const configTs = readFileSync(configTsPath, 'utf-8');
+        const _configTs = readFileSync(configTsPath, 'utf-8');
 
         // Extract field names from SeedConfigSchema definition
         // This is a basic grep-like check to ensure visibility
@@ -42,7 +42,7 @@ describe('Documentation Drift Guard', () => {
     });
 
     it('docs/configuration.md should mention critical CLI flags', () => {
-        const cliTs = readFileSync(cliTsPath, 'utf-8');
+        const _cliTs = readFileSync(cliTsPath, 'utf-8');
 
         const criticalFlags = ['run-id', 'config', 'dry-run'];
 

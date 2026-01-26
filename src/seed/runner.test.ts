@@ -4,7 +4,7 @@
  * Tests the exported interface and types without mocking internal dependencies.
  * For more thorough integration testing, see runner.cleanup.test.ts
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { CleanupOptions } from './runner.js';
 import type { SeedSummary } from './summary.js';
 

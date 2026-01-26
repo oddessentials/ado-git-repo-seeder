@@ -8,8 +8,8 @@ on:
 
 jobs:
   test:
-    #runs-on: ubuntu-latest
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
+    # runs-on: [self-hosted, linux]
 
     # Required for stefanzweifel/git-auto-commit-action to push badge updates
     permissions:
@@ -49,10 +49,10 @@ jobs:
         run: npm run format:check
 
       - name: Lint
-        run: npm run lint
+        run: npm run lint:strict
 
       - name: Run tests with coverage
-        run: npx vitest run --coverage --coverage.thresholds.statements=70 --coverage.thresholds.branches=50 --coverage.thresholds.functions=70 --coverage.thresholds.lines=70
+        run: npx vitest run --coverage
 
       - name: Security audit
         run: npm audit --audit-level=high

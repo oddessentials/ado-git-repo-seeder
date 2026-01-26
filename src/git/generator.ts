@@ -61,6 +61,8 @@ export class GitGenerator {
             await this.git(actualTempDir, ['init']);
             await this.git(actualTempDir, ['config', 'user.email', 'seeder@example.com']);
             await this.git(actualTempDir, ['config', 'user.name', 'ADO Seeder']);
+            // Disable GPG signing to ensure commits work in all environments
+            await this.git(actualTempDir, ['config', 'commit.gpgsign', 'false']);
 
             // Create initial commit on main
             writeFileSync(join(actualTempDir, 'README.md'), `# ${repoName}\n\nSeeded repository.`);
@@ -154,6 +156,9 @@ export class GitGenerator {
                 await this.git(localPath, ['push', cleanUrl, branch], true, env);
             }
         } catch (error) {
+            // Log error details for debugging before propagating
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            console.error(`❌ Git push failed: ${errorMsg}`);
             throw error;
         } finally {
             askPass.cleanup();
@@ -238,9 +243,10 @@ export class GitGenerator {
             const repoPath = join(tempDir, 'repo');
             await this.git(tempDir, ['clone', '--no-single-branch', '--depth', '200', cleanUrl, 'repo'], true, env);
 
-            // Configure identity
+            // Configure identity and disable GPG signing
             await this.git(repoPath, ['config', 'user.email', 'seeder@example.com']);
             await this.git(repoPath, ['config', 'user.name', 'ADO Seeder']);
+            await this.git(repoPath, ['config', 'commit.gpgsign', 'false']);
 
             // Always fetch latest refs for both branches
             await this.git(repoPath, ['fetch', 'origin', '--prune'], true, env);

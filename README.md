@@ -1,7 +1,7 @@
 # ADO Git Repo Seeder (v1.1.0)
 
 <!-- BADGES:START -->
-[![CI](https://github.com/oddessentials/ado-git-repo-seeder/actions/workflows/ci.yml/badge.svg)](https://github.com/oddessentials/ado-git-repo-seeder/actions/workflows/ci.yml) [![Coverage](https://img.shields.io/badge/coverage-77%25-yellow)](./coverage/index.html) [![Version](https://img.shields.io/badge/version-1.1.0-blue)](./package.json) [![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-green)](./package.json)
+[![CI](https://github.com/oddessentials/ado-git-repo-seeder/actions/workflows/ci.yml/badge.svg)](https://github.com/oddessentials/ado-git-repo-seeder/actions/workflows/ci.yml) [![Coverage](https://img.shields.io/badge/coverage-81%25-brightgreen)](./coverage/index.html) [![Version](https://img.shields.io/badge/version-1.1.0-blue)](./package.json) [![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-green)](./package.json)
 <!-- BADGES:END -->
 
 A professional, configurable Node.js tool to seed realistic, multi-user Pull Request activity in Azure DevOps.
@@ -28,6 +28,9 @@ This documentation follows a **Normative vs. Descriptive** architecture. Technic
 | [enterprise](examples/enterprise/) | 10 | isolated | Large-scale testing |
 | [accumulation](examples/accumulation/) | 2 | direct | Multi-day activity |
 | [isolated-greenfield](examples/isolated-greenfield/) | 1 | isolated | Fresh repos per run |
+
+### 🔬 Architecture
+- **[Architecture Diagrams](docs/internal/MERMAID.md)**: Visual Mermaid diagrams of execution flows, module dependencies, and security patterns.
 
 ---
 

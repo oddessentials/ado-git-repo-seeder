@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
-import { join, extname, basename } from 'node:path';
+import { join, extname } from 'node:path';
 import { SeededRng } from '../util/rng.js';
 
 // Safe text file extensions for derivation

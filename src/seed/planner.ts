@@ -1,5 +1,5 @@
 import { SeededRng } from '../util/rng.js';
-import { resolveRepoConfig, LoadedConfig, ResolvedUser } from '../config.js';
+import { resolveRepoConfig, LoadedConfig } from '../config.js';
 import { VoteValue } from '../ado/prs.js';
 
 export type PrOutcome = 'complete' | 'abandon' | 'leaveOpen';

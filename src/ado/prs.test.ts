@@ -4,10 +4,21 @@
  * Covers all PR operations: create, review, comment, complete, abandon.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { AxiosInstance } from 'axios';
 import { PrManager } from './prs.js';
 
+/**
+ * Mock Axios client for testing PrManager
+ */
+interface MockPrClient {
+    get: ReturnType<typeof vi.fn>;
+    post: ReturnType<typeof vi.fn>;
+    put: ReturnType<typeof vi.fn>;
+    patch: ReturnType<typeof vi.fn>;
+}
+
 describe('PrManager', () => {
-    let mockClient: any;
+    let mockClient: MockPrClient;
     let prManager: PrManager;
 
     beforeEach(() => {
@@ -17,7 +28,7 @@ describe('PrManager', () => {
             put: vi.fn(),
             patch: vi.fn(),
         };
-        prManager = new PrManager(mockClient);
+        prManager = new PrManager(mockClient as unknown as AxiosInstance);
     });
 
     describe('createPr', () => {

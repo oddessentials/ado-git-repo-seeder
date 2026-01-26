@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import { GitGenerator } from './generator.js';
 import { SeededRng } from '../util/rng.js';
 import { exec } from '../util/exec.js';
@@ -6,6 +6,13 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 vi.mock('../util/exec.js');
+
+/**
+ * Test-only type for exec options parameter
+ */
+interface ExecOptions {
+    cwd?: string;
+}
 
 describe('GitGenerator.resolveConflicts', () => {
     let generator: GitGenerator;
@@ -19,9 +26,9 @@ describe('GitGenerator.resolveConflicts', () => {
         let revParseCallCount = 0;
 
         // Default successful mock for all git commands
-        (exec as any).mockImplementation((cmd: string, args: string[], options: any) => {
+        (exec as Mock).mockImplementation((cmd: string, args: string[], options?: ExecOptions) => {
             if (args.includes('clone')) {
-                const repoDir = join(options.cwd, 'repo');
+                const repoDir = join(options?.cwd ?? '', 'repo');
                 try {
                     mkdirSync(repoDir, { recursive: true });
                 } catch {}
@@ -171,7 +178,7 @@ describe('GitGenerator.resolveConflicts', () => {
     describe('push verification guard', () => {
         it('returns resolved: false if remote SHA does not match after push', async () => {
             let revParseCalls = 0;
-            (exec as any).mockImplementation((cmd: string, args: string[]) => {
+            (exec as Mock).mockImplementation((cmd: string, args: string[]) => {
                 if (args.includes('rev-parse')) {
                     revParseCalls++;
                     return Promise.resolve({ stdout: revParseCalls === 1 ? 'old' : 'new-sha', stderr: '', code: 0 });
@@ -200,9 +207,9 @@ describe('GitGenerator.resolveConflicts', () => {
             let mergeAborted = false;
             let commitHappened = false;
 
-            (exec as any).mockImplementation((cmd: string, args: string[], options: any) => {
+            (exec as Mock).mockImplementation((cmd: string, args: string[], options?: ExecOptions) => {
                 if (args.includes('clone')) {
-                    const repoDir = join(options.cwd, 'repo');
+                    const repoDir = join(options?.cwd ?? '', 'repo');
                     try {
                         mkdirSync(repoDir, { recursive: true });
                     } catch {}
@@ -250,15 +257,19 @@ describe('GitGenerator.resolveConflicts', () => {
 
     describe('error handling', () => {
         it('returns resolved: false when clone fails', async () => {
-            (exec as any).mockImplementation((cmd: string, args: string[]) => {
+            (exec as Mock).mockImplementation((cmd: string, args: string[]) => {
                 if (args.includes('clone')) {
                     return Promise.resolve({ stdout: '', stderr: 'clone failed', code: 128 });
                 }
                 return Promise.resolve({ stdout: '', stderr: '', code: 0 });
             });
 
-            const originalGit = (generator as any).git.bind(generator);
-            (generator as any).git = async (cwd: string, args: string[], ...rest: any[]) => {
+            // Using type assertion to access private method for testing
+            const generatorWithPrivate = generator as unknown as {
+                git: (cwd: string, args: string[], ...rest: unknown[]) => Promise<unknown>;
+            };
+            const originalGit = generatorWithPrivate.git.bind(generator);
+            generatorWithPrivate.git = async (cwd: string, args: string[], ...rest: unknown[]) => {
                 if (args.includes('clone')) {
                     throw new Error('Git command failed: git clone');
                 }

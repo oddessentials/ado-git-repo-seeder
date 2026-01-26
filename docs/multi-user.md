@@ -11,7 +11,7 @@ The tool performs a **one-time lookup** per run (or utilizes the cache) to map e
 
 ### Identity Caching
 To reduce API calls, identity mappings are stored in `identities.cache.json`.
-- **Note**: If you change the `org`, you should delete the cache to force a refresh.
+- **Note**: If you change the `org`, you should use `--clear-cache` to force a refresh, or manually delete the cache file.
 
 ---
 

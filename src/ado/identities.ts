@@ -93,7 +93,7 @@ export class IdentityResolver {
     async resolveWithBypass(email: string): Promise<string> {
         try {
             return await this.resolve(email);
-        } catch (error) {
+        } catch {
             // Invalidate and retry once
             this.invalidate(email);
             return await this.resolve(email);

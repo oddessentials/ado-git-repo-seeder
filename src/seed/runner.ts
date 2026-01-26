@@ -1,8 +1,8 @@
-import { LoadedConfig, ResolvedUser } from '../config.js';
-import { createAdoClient, createIdentityClient } from '../ado/client.js';
+import { LoadedConfig } from '../config.js';
+import { createAdoClient, createIdentityClient, isAdoApiError } from '../ado/client.js';
 import { IdentityResolver } from '../ado/identities.js';
 import { RepoManager } from '../ado/repos.js';
-import { PrManager, PullRequest } from '../ado/prs.js';
+import { PrManager, PullRequest, ExtendedPullRequest } from '../ado/prs.js';
 import { GitGenerator, BranchSpec } from '../git/generator.js';
 import { SeedPlan, PlannedRepo, PlannedPr, voteToValue } from './planner.js';
 import { SeedSummary, RepoResult, PrResult, FailureRecord } from './summary.js';
@@ -210,7 +210,7 @@ export class SeedRunner {
                                 repoName,
                                 remoteUrl: repo.remoteUrl,
                                 pr,
-                                createdDate: new Date((pr as any).creationDate || 0),
+                                createdDate: new Date((pr as ExtendedPullRequest).creationDate || '1970-01-01'),
                             });
                         }
                     }
@@ -235,7 +235,7 @@ export class SeedRunner {
             const prTitle = pr.title.length > 50 ? pr.title.slice(0, 47) + '...' : pr.title;
 
             try {
-                if ((pr as any).isDraft) {
+                if ((pr as ExtendedPullRequest).isDraft) {
                     console.log(`   📝 Publishing draft PR #${pr.pullRequestId}: ${prTitle}`);
                     await this.prManager.publishDraft(project, repoId, pr.pullRequestId);
                     stats.draftsPublished++;
@@ -298,14 +298,14 @@ export class SeedRunner {
                         p.isEnabled &&
                         !p.isDeleted &&
                         ['Minimum reviewer count', 'Required reviewers', 'Check for merge conflicts'].includes(
-                            p.type.displayName
+                            p.type?.displayName ?? ''
                         )
                 );
 
                 if (dangerousPolicies.length > 0) {
                     console.warn(`\n⚠️  [POLICY WARNING] Active branch policies detected in project '${project}':`);
                     for (const p of dangerousPolicies) {
-                        console.warn(`   - ${p.type.displayName}`);
+                        console.warn(`   - ${p.type?.displayName ?? 'Unknown policy'}`);
                     }
                     console.warn(`   These may block automated PR completion if criteria aren't met.\n`);
                 }
@@ -404,7 +404,7 @@ export class SeedRunner {
 
     private async processPr(
         project: string,
-        repo: any, // AdoRepo
+        repo: { id: string; name: string; remoteUrl: string }, // AdoRepo shape
         planned: PlannedPr,
         failures: FailureRecord[],
         localPath?: string
@@ -793,10 +793,12 @@ export class SeedRunner {
 
                 console.log(`   ✅ PR #${prId} successfully completed and verified`);
                 return true;
-            } catch (error: any) {
-                const adoData = error?.response?.data ?? error?.data;
+            } catch (error: unknown) {
+                // Use type guard for runtime-safe error handling
+                const adoError = isAdoApiError(error) ? error : null;
+                const adoData = adoError?.data;
                 const isStaleException = adoData?.typeKey === 'GitPullRequestStaleException';
-                const statusCode = error?.status ?? error?.response?.status;
+                const statusCode = adoError?.status;
 
                 // TF401192: source modified since last merge attempt.
                 // Fix: refetch PR and retry completion; DO NOT resolve again (that creates more commits and loops staleness).

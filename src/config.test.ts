@@ -134,14 +134,16 @@ describe('config', () => {
     });
 
     describe('resolveRepoConfig()', () => {
-        const mockConfig: any = {
-            repoNaming: 'isolated',
+        // Using type assertions for partial mock objects
+        // These are minimal mocks that only contain the fields accessed by the function
+        const mockConfig = {
+            repoNaming: 'isolated' as const,
             repoStrategy: { createIfMissing: true, failIfMissing: false, skipIfExists: false },
-        };
+        } as Parameters<typeof resolveRepoConfig>[0];
 
-        const mockProject: any = {
+        const mockProject = {
             name: 'p1',
-        };
+        } as Parameters<typeof resolveRepoConfig>[1];
 
         it('resolves string repo to isolated naming by default', () => {
             const resolved = resolveRepoConfig(mockConfig, mockProject, 'repoA');
@@ -159,13 +161,13 @@ describe('config', () => {
         });
 
         it('prefers project-level overrides over global', () => {
-            const projectWithOverride = { ...mockProject, repoNaming: 'direct' };
+            const projectWithOverride = { ...mockProject, repoNaming: 'direct' as const };
             const resolved = resolveRepoConfig(mockConfig, projectWithOverride, 'repoC');
             expect(resolved.repoNaming).toBe('direct');
         });
 
         it('prefers repo-level overrides over project-level', () => {
-            const projectWithOverride = { ...mockProject, repoNaming: 'direct' };
+            const projectWithOverride = { ...mockProject, repoNaming: 'direct' as const };
             const resolved = resolveRepoConfig(mockConfig, projectWithOverride, {
                 name: 'repoD',
                 repoNaming: 'isolated',

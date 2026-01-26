@@ -3,8 +3,7 @@ import { redactPat } from '../config.js';
 import { GitGenerator } from '../git/generator.js';
 import { SeededRng } from '../util/rng.js';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 
 describe('Security Canary', () => {
     describe('PAT Redaction', () => {

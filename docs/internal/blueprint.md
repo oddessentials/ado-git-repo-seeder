@@ -22,7 +22,7 @@ The tool must:
 
 ## Tech Stack
 
-- **Node.js 18+ / TypeScript**
+- **Node.js 20+ / TypeScript**
 - **Git CLI**
 - **Azure DevOps REST API**
 - Azure DevOps CLI: **optional**, for validation/debug only (not required at runtime)
