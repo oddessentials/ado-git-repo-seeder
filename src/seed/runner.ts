@@ -1,5 +1,5 @@
 import { LoadedConfig } from '../config.js';
-import { createAdoClient, createIdentityClient } from '../ado/client.js';
+import { createAdoClient, createIdentityClient, isAdoApiError } from '../ado/client.js';
 import { IdentityResolver } from '../ado/identities.js';
 import { RepoManager } from '../ado/repos.js';
 import { PrManager, PullRequest, ExtendedPullRequest } from '../ado/prs.js';
@@ -794,15 +794,11 @@ export class SeedRunner {
                 console.log(`   ✅ PR #${prId} successfully completed and verified`);
                 return true;
             } catch (error: unknown) {
-                const typedError = error as {
-                    response?: { data?: { typeKey?: string }; status?: number };
-                    data?: { typeKey?: string };
-                    status?: number;
-                    message?: string;
-                };
-                const adoData = typedError?.response?.data ?? typedError?.data;
+                // Use type guard for runtime-safe error handling
+                const adoError = isAdoApiError(error) ? error : null;
+                const adoData = adoError?.data;
                 const isStaleException = adoData?.typeKey === 'GitPullRequestStaleException';
-                const statusCode = typedError?.status ?? typedError?.response?.status;
+                const statusCode = adoError?.status;
 
                 // TF401192: source modified since last merge attempt.
                 // Fix: refetch PR and retry completion; DO NOT resolve again (that creates more commits and loops staleness).

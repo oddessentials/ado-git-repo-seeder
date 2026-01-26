@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import axios from 'axios';
-import { createAdoClient, createIdentityClient } from './client.js';
+import { createAdoClient, createIdentityClient, isAdoApiError } from './client.js';
 
 /**
  * Type-safe API response structure for testing.
@@ -528,6 +528,103 @@ describe('ADO Client Factory', () => {
                 name: 'AdoApiError',
                 message: expect.not.stringContaining(secretPat),
             });
+        });
+
+        it('response interceptor retries on 500 for identity client', async () => {
+            let responseInterceptor: MockResponseInterceptor | null = null;
+            const mockRequest = vi.fn().mockResolvedValue({ data: 'identity-success', status: 200 });
+            const mockClient = {
+                interceptors: {
+                    request: { use: vi.fn() },
+                    response: {
+                        use: vi.fn((success, error) => {
+                            responseInterceptor = { success, error };
+                        }),
+                    },
+                },
+                request: mockRequest,
+            };
+            vi.mocked(axios.create).mockReturnValue(mockClient as unknown as ReturnType<typeof axios.create>);
+
+            createIdentityClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
+
+            const serverError = {
+                config: { _retryCount: 0 },
+                message: 'Internal Server Error',
+                response: { status: 500, data: {} },
+            };
+
+            const result = await responseInterceptor!.error(serverError);
+            expect(mockRequest).toHaveBeenCalledTimes(1);
+            expect(result).toEqual({ data: 'identity-success', status: 200 });
+        });
+
+        it('response interceptor passes through success for identity client', async () => {
+            let responseInterceptor: MockResponseInterceptor | null = null;
+            const mockClient = {
+                interceptors: {
+                    request: { use: vi.fn() },
+                    response: {
+                        use: vi.fn((success, error) => {
+                            responseInterceptor = { success, error };
+                        }),
+                    },
+                },
+            };
+            vi.mocked(axios.create).mockReturnValue(mockClient as unknown as ReturnType<typeof axios.create>);
+
+            createIdentityClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
+
+            const mockResponse = { data: { value: 'identity-data' }, status: 200 };
+            const result = responseInterceptor!.success(mockResponse);
+            expect(result).toEqual(mockResponse);
+        });
+    });
+
+    describe('isAdoApiError type guard', () => {
+        it('returns true for AdoApiError with status', () => {
+            const error = new Error('Test error');
+            error.name = 'AdoApiError';
+            (error as { status?: number }).status = 404;
+
+            expect(isAdoApiError(error)).toBe(true);
+        });
+
+        it('returns true for AdoApiError with data', () => {
+            const error = new Error('Test error');
+            error.name = 'AdoApiError';
+            (error as { data?: unknown }).data = { typeKey: 'TestException' };
+
+            expect(isAdoApiError(error)).toBe(true);
+        });
+
+        it('returns true for AdoApiError with both status and data', () => {
+            const error = new Error('Test error');
+            error.name = 'AdoApiError';
+            (error as { status?: number; data?: unknown }).status = 500;
+            (error as { status?: number; data?: unknown }).data = { typeKey: 'ServerError' };
+
+            expect(isAdoApiError(error)).toBe(true);
+        });
+
+        it('returns false for regular Error', () => {
+            const error = new Error('Regular error');
+
+            expect(isAdoApiError(error)).toBe(false);
+        });
+
+        it('returns false for non-Error objects', () => {
+            expect(isAdoApiError({ message: 'Not an error' })).toBe(false);
+            expect(isAdoApiError('string error')).toBe(false);
+            expect(isAdoApiError(null)).toBe(false);
+            expect(isAdoApiError(undefined)).toBe(false);
+        });
+
+        it('returns false for Error with wrong name', () => {
+            const error = new Error('Wrong name');
+            error.name = 'TypeError';
+
+            expect(isAdoApiError(error)).toBe(false);
         });
     });
 });

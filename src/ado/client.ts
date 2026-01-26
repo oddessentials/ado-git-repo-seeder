@@ -11,6 +11,24 @@ export interface AdoClientOptions {
 }
 
 /**
+ * Structured error from ADO API with sanitized message and response data.
+ * Use isAdoApiError() type guard for runtime type checking.
+ */
+export interface AdoApiError extends Error {
+    name: 'AdoApiError';
+    status?: number;
+    data?: { typeKey?: string; [key: string]: unknown };
+}
+
+/**
+ * Type guard for AdoApiError.
+ * Use this instead of type assertions for runtime-safe error handling.
+ */
+export function isAdoApiError(error: unknown): error is AdoApiError {
+    return error instanceof Error && error.name === 'AdoApiError' && ('status' in error || 'data' in error || true);
+}
+
+/**
  * Creates an Axios client for Azure DevOps REST API with retry and redaction.
  */
 export function createAdoClient(options: AdoClientOptions): AxiosInstance {
@@ -101,13 +119,13 @@ export function createIdentityClient(options: AdoClientOptions): AxiosInstance {
     return client;
 }
 
-function sanitizeError(error: AxiosError, pats: string[]): Error {
+function sanitizeError(error: AxiosError, pats: string[]): AdoApiError {
     const message = redactPat(error.message, pats);
-    const sanitized = new Error(message);
+    const sanitized = new Error(message) as AdoApiError;
     sanitized.name = 'AdoApiError';
     if (error.response) {
-        (sanitized as { status?: number }).status = error.response.status;
-        (sanitized as { data?: unknown }).data = error.response.data;
+        sanitized.status = error.response.status;
+        sanitized.data = error.response.data as AdoApiError['data'];
     }
     return sanitized;
 }
