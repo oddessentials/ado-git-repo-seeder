@@ -28,25 +28,53 @@ flowchart TD
 
 ---
 
-## Cleanup Mode Logic
+## Module Dependencies
 
 ```mermaid
-flowchart TD
-    A[Cleanup Mode Triggered] --> B[List All Open PRs]
-    B --> C[Sort by Creation Date]
-    C --> D[For Each Oldest PR]
+graph TD
+    CLI[cli.ts] --> Config[config.ts]
+    CLI --> Planner[planner.ts]
+    CLI --> Runner[runner.ts]
+    CLI --> Summary[summary.ts]
     
-    D --> E{Is Draft?}
-    E -->|Yes| F[Publish Draft]
-    F --> G[Continue to Next PR]
+    Runner --> PrManager[prs.ts]
+    Runner --> RepoManager[repos.ts]
+    Runner --> IdentityResolver[identities.ts]
+    Runner --> GitGenerator[generator.ts]
+    Runner --> Summary
     
-    E -->|No| H[Get PR Details]
-    H --> I[Complete PR]
-    I --> J{Target Count Reached?}
+    GitGenerator --> Deriver[deriver.ts]
+    GitGenerator --> Exec[exec.ts]
     
-    J -->|No| D
-    J -->|Yes| K[Return Stats]
-    G --> J
+    Planner --> RNG[rng.ts]
+    
+    PrManager --> Client[client.ts]
+    RepoManager --> Client
+    IdentityResolver --> Client
+    
+    subgraph "ADO API Layer"
+        Client
+        PrManager
+        RepoManager
+        IdentityResolver
+    end
+    
+    subgraph "Git Layer"
+        GitGenerator
+        Deriver
+        Exec
+    end
+    
+    subgraph "Core"
+        Config
+        Planner
+        Runner
+        Summary
+    end
+    
+    subgraph "Utilities"
+        RNG
+    end
 ```
 
 ---
@@ -73,7 +101,7 @@ flowchart TD
     M --> N[Add Comments]
     N --> O{Outcome?}
     
-    O -->|complete| P[Complete PR]
+    O -->|complete| P[Complete PR w/ Conflict Resolution]
     O -->|abandon| Q[Abandon PR]
     O -->|leaveOpen| R[Leave Open]
     
@@ -81,6 +109,82 @@ flowchart TD
     Q --> S
     R --> S
     S --> D
+```
+
+---
+
+## Conflict Resolution Flow
+
+```mermaid
+flowchart TD
+    A[Complete PR Request] --> B{Merge Status?}
+    B -->|conflicts| C[Fetch Target Branch]
+    C --> D[Merge with -X ours Strategy]
+    D --> E[Push Resolved Branch]
+    E --> F[Verify Push via ls-remote]
+    F --> G{Push Verified?}
+    G -->|Yes| H[Wait for ADO Merge Status Update]
+    G -->|No| I[Retry or Fail]
+    H --> J{Merge Status = succeeded?}
+    J -->|Yes| K[Complete PR]
+    J -->|No| L[Wait & Retry]
+    L --> J
+    K --> M[Wait for Completion]
+    M --> N[Return Success]
+    
+    B -->|succeeded| K
+    B -->|queued/notSet| O[Wait for Evaluation]
+    O --> B
+```
+
+---
+
+## ASKPASS Authentication Pattern
+
+```mermaid
+sequenceDiagram
+    participant Runner
+    participant TempFS as Temp Filesystem
+    participant Git
+    participant ADO
+    
+    Note over Runner: Create ephemeral ASKPASS script
+    Runner->>TempFS: Write script with PAT
+    Runner->>TempFS: chmod +x script
+    
+    Runner->>Git: Execute with GIT_ASKPASS env
+    Git->>TempFS: Request credentials
+    TempFS->>Git: Return PAT
+    Git->>ADO: Authenticated operation
+    ADO->>Git: Response
+    Git->>Runner: Operation result
+    
+    Runner->>TempFS: Delete script
+    
+    Note over Runner: PAT never touches .git/config
+```
+
+---
+
+## Cleanup Mode Logic
+
+```mermaid
+flowchart TD
+    A[Cleanup Mode Triggered] --> B[List All Open PRs]
+    B --> C[Sort by Creation Date]
+    C --> D[For Each Oldest PR]
+    
+    D --> E{Is Draft?}
+    E -->|Yes| F[Publish Draft]
+    F --> G[Continue to Next PR]
+    
+    E -->|No| H[Get PR Details]
+    H --> I[Complete PR w/ Conflict Resolution]
+    I --> J{Target Count Reached?}
+    
+    J -->|No| D
+    J -->|Yes| K[Return Stats]
+    G --> J
 ```
 
 ---
@@ -109,56 +213,6 @@ flowchart TD
 
 ---
 
-## Module Dependencies
-
-```mermaid
-graph TD
-    CLI[cli.ts] --> Config[config.ts]
-    CLI --> Planner[planner.ts]
-    CLI --> Runner[runner.ts]
-    
-    Runner --> PrManager[prs.ts]
-    Runner --> RepoManager[repos.ts]
-    Runner --> IdentityResolver[identities.ts]
-    Runner --> GitGenerator[generator.ts]
-    
-    GitGenerator --> Deriver[deriver.ts]
-    GitGenerator --> Exec[exec.ts]
-    
-    Planner --> RNG[rng.ts]
-    
-    subgraph "ADO API Layer"
-        PrManager
-        RepoManager
-        IdentityResolver
-    end
-    
-    subgraph "Git Layer"
-        GitGenerator
-        Deriver
-        Exec
-    end
-    
-    subgraph "Core"
-        Config
-        Planner
-        Runner
-    end
-```
-
----
-
-## PR Outcome Distribution
-
-```mermaid
-pie title PR Outcomes per Run
-    "Complete" : 75
-    "Leave Open" : 20
-    "Abandon" : 5
-```
-
----
-
 ## Multi-User Attribution
 
 ```mermaid
@@ -182,6 +236,28 @@ sequenceDiagram
 
 ---
 
+## Summary Output Generation
+
+```mermaid
+flowchart LR
+    A[Run Complete] --> B[Collect Results]
+    
+    B --> C[RepoResult per Repo]
+    C --> D[PrResult per PR]
+    
+    D --> E{Cleanup Mode?}
+    E -->|Yes| F[Cleanup Stats]
+    E -->|No| G[Normal Stats]
+    
+    F --> H[Generate Markdown]
+    G --> H
+    
+    H --> I[Write JSON Summary]
+    H --> J[Print to Console]
+```
+
+---
+
 ## GitHub Actions Workflow
 
 ```mermaid
@@ -200,4 +276,15 @@ flowchart LR
     subgraph "10:00 & 18:00 UTC"
         A
     end
+```
+
+---
+
+## PR Outcome Distribution
+
+```mermaid
+pie title PR Outcomes per Run
+    "Complete" : 75
+    "Leave Open" : 20
+    "Abandon" : 5
 ```

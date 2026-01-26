@@ -29,6 +29,9 @@ This documentation follows a **Normative vs. Descriptive** architecture. Technic
 | [accumulation](examples/accumulation/) | 2 | direct | Multi-day activity |
 | [isolated-greenfield](examples/isolated-greenfield/) | 1 | isolated | Fresh repos per run |
 
+### 🔬 Architecture
+- **[Architecture Diagrams](docs/internal/MERMAID.md)**: Visual Mermaid diagrams of execution flows, module dependencies, and security patterns.
+
 ---
 
 ## ⚡ Quick Start (3 Min)
