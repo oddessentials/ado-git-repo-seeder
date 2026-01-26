@@ -9,6 +9,31 @@ export interface PullRequest {
     url: string;
 }
 
+/**
+ * Extended PullRequest with optional ADO-specific fields.
+ * Used for type-safe access to fields like creationDate and isDraft
+ * that may not always be present in the base response.
+ */
+export interface ExtendedPullRequest extends PullRequest {
+    creationDate?: string;
+    isDraft?: boolean;
+}
+
+/**
+ * ADO Policy Configuration structure.
+ * Returned by getPolicyConfigurations for branch policy discovery.
+ */
+export interface PolicyConfiguration {
+    id: number;
+    isEnabled: boolean;
+    isDeleted: boolean;
+    type: {
+        id: string;
+        displayName: string;
+    };
+    settings?: Record<string, unknown>;
+}
+
 export type VoteValue = 10 | 5 | -10 | 0; // approve, approveWithSuggestions, reject, noVote
 
 export interface CreatePrOptions {
@@ -198,7 +223,7 @@ export class PrManager {
     /**
      * Gets policy configurations for a project.
      */
-    async getPolicyConfigurations(project: string): Promise<unknown[]> {
+    async getPolicyConfigurations(project: string): Promise<PolicyConfiguration[]> {
         const response = await this.client.get(`/${project}/_apis/policy/configurations`, {
             params: { 'api-version': '7.1' },
         });

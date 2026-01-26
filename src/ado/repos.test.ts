@@ -12,6 +12,9 @@ import { RepoManager } from './repos.js';
 
 /**
  * Sanitized error format from client.ts sanitizeError()
+ * This interface intentionally mirrors the production error shape where
+ * status is placed directly on the error object (not error.response.status).
+ * This tests that repos.ts correctly handles both sanitized and raw error formats.
  */
 interface SanitizedError extends Error {
     status?: number;

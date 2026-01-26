@@ -8,12 +8,21 @@ import axios from 'axios';
 import { createAdoClient, createIdentityClient } from './client.js';
 
 /**
+ * Type-safe API response structure for testing.
+ * Provides a structured shape for mock responses while allowing extension.
+ */
+interface MockApiResponse {
+    data?: unknown;
+    status?: number;
+    [key: string]: unknown;
+}
+
+/**
  * Type-safe interceptor handler interface for testing response interceptors.
- * Uses generic response/error types to accommodate test mock flexibility.
  */
 interface MockResponseInterceptor {
-    success: (response: Record<string, unknown>) => Record<string, unknown>;
-    error: (error: MockAxiosError) => Promise<Record<string, unknown>>;
+    success: (response: MockApiResponse) => MockApiResponse;
+    error: (error: MockAxiosError) => Promise<MockApiResponse>;
 }
 
 /**

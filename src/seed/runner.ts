@@ -2,7 +2,7 @@ import { LoadedConfig } from '../config.js';
 import { createAdoClient, createIdentityClient } from '../ado/client.js';
 import { IdentityResolver } from '../ado/identities.js';
 import { RepoManager } from '../ado/repos.js';
-import { PrManager, PullRequest } from '../ado/prs.js';
+import { PrManager, PullRequest, ExtendedPullRequest } from '../ado/prs.js';
 import { GitGenerator, BranchSpec } from '../git/generator.js';
 import { SeedPlan, PlannedRepo, PlannedPr, voteToValue } from './planner.js';
 import { SeedSummary, RepoResult, PrResult, FailureRecord } from './summary.js';
@@ -210,9 +210,7 @@ export class SeedRunner {
                                 repoName,
                                 remoteUrl: repo.remoteUrl,
                                 pr,
-                                createdDate: new Date(
-                                    (pr as PullRequest & { creationDate?: string }).creationDate || '1970-01-01'
-                                ),
+                                createdDate: new Date((pr as ExtendedPullRequest).creationDate || '1970-01-01'),
                             });
                         }
                     }
@@ -237,7 +235,7 @@ export class SeedRunner {
             const prTitle = pr.title.length > 50 ? pr.title.slice(0, 47) + '...' : pr.title;
 
             try {
-                if ((pr as PullRequest & { isDraft?: boolean }).isDraft) {
+                if ((pr as ExtendedPullRequest).isDraft) {
                     console.log(`   📝 Publishing draft PR #${pr.pullRequestId}: ${prTitle}`);
                     await this.prManager.publishDraft(project, repoId, pr.pullRequestId);
                     stats.draftsPublished++;
@@ -292,13 +290,10 @@ export class SeedRunner {
         const projects = [...new Set(this.plan.repos.map((r) => r.project))];
         console.log('🔍 Preflight: Checking for branch policies...');
 
-        // Type for ADO policy configuration
-        type PolicyConfig = { isEnabled?: boolean; isDeleted?: boolean; type?: { displayName?: string } };
-
         for (const project of projects) {
             try {
                 const policies = await this.prManager.getPolicyConfigurations(project);
-                const dangerousPolicies = (policies as PolicyConfig[]).filter(
+                const dangerousPolicies = policies.filter(
                     (p) =>
                         p.isEnabled &&
                         !p.isDeleted &&

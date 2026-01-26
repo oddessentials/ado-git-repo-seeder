@@ -52,7 +52,7 @@ jobs:
         run: npm run lint:strict
 
       - name: Run tests with coverage
-        run: npx vitest run --coverage
+        run: npx vitest run --coverage --coverage.thresholds.statements=80 --coverage.thresholds.branches=62 --coverage.thresholds.functions=88 --coverage.thresholds.lines=81
 
       - name: Security audit
         run: npm audit --audit-level=high
