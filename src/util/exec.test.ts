@@ -6,6 +6,7 @@
  * causing "spawn cmd.exe ENOENT" errors on Windows.
  */
 import { describe, it, expect, afterEach } from 'vitest';
+import { tmpdir } from 'node:os';
 import { exec } from './exec.js';
 
 describe('exec utility', () => {
@@ -109,12 +110,18 @@ describe('exec utility', () => {
 
     describe('working directory', () => {
         it('executes in specified working directory', async () => {
-            const result = await exec('pwd', [], {
-                cwd: '/tmp',
+            const isWindows = process.platform === 'win32';
+            const tempDir = tmpdir();
+
+            // Use platform-appropriate command to print working directory
+            // Windows: 'cd' prints cwd; Unix: 'pwd' prints cwd
+            const result = await exec(isWindows ? 'cd' : 'pwd', [], {
+                cwd: tempDir,
             });
 
             expect(result.code).toBe(0);
-            expect(result.stdout).toContain('/tmp');
+            // Case-insensitive comparison for Windows path normalization
+            expect(result.stdout.toLowerCase()).toContain(tempDir.toLowerCase().replace(/\\/g, '\\'));
         });
     });
 
@@ -129,11 +136,19 @@ describe('exec utility', () => {
 
         it('redacts PATs from stderr', async () => {
             const secretPat = 'stderr-secret-pat';
-            // Write to stderr via env var to avoid shell quoting issues
-            const result = await exec('sh', ['-c', 'printf "%s" "$SECRET_VAL" >&2'], {
-                env: { SECRET_VAL: secretPat },
-                patsToRedact: [secretPat],
-            });
+            const isWindows = process.platform === 'win32';
+
+            // Write to stderr using platform-appropriate shell
+            // Windows: cmd /c "echo message 1>&2"
+            // Unix: sh -c 'printf "%s" "$SECRET_VAL" >&2'
+            const result = isWindows
+                ? await exec('cmd', ['/c', `echo ${secretPat} 1>&2`], {
+                      patsToRedact: [secretPat],
+                  })
+                : await exec('sh', ['-c', 'printf "%s" "$SECRET_VAL" >&2'], {
+                      env: { SECRET_VAL: secretPat },
+                      patsToRedact: [secretPat],
+                  });
 
             expect(result.stderr).not.toContain(secretPat);
             expect(result.stderr).toContain('[REDACTED]');

@@ -19,8 +19,7 @@ jobs:
       target_repo: ${{ github.repository }}
       target_ref: ${{ github.sha }}
       pr_number: ${{ github.event.pull_request.number }}
-      # CRITICAL: Explicitly target self-hosted runner
-      runs_on: '["self-hosted", "linux"]'
+      # runs_on: '["self-hosted", "linux"]'
       # runs_on: '["ubuntu-latest"]' if default and not needed but here to be explicit
 
     secrets:
