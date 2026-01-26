@@ -96,7 +96,11 @@ describe('exec utility', () => {
 
     describe('exit codes', () => {
         it('returns non-zero exit code for failed commands', async () => {
-            const result = await exec('ls', ['/nonexistent/path/that/does/not/exist']);
+            const isWindows = process.platform === 'win32';
+            // Use platform-appropriate command and path format
+            const result = isWindows
+                ? await exec('cmd', ['/c', 'dir', 'C:\\nonexistent-path-12345'])
+                : await exec('ls', ['/nonexistent/path/that/does/not/exist']);
 
             expect(result.code).not.toBe(0);
         });
@@ -127,10 +131,13 @@ describe('exec utility', () => {
 
     describe('stderr handling', () => {
         it('captures stderr output', async () => {
-            // Use a command that writes to stderr
-            const result = await exec('ls', ['/nonexistent-path-12345']);
+            const isWindows = process.platform === 'win32';
+            // Use platform-appropriate command to generate stderr
+            const result = isWindows
+                ? await exec('cmd', ['/c', 'dir', 'C:\\nonexistent-path-12345'])
+                : await exec('ls', ['/nonexistent-path-12345']);
 
-            // Should have something in stderr (the error message)
+            // Should have non-zero exit code for the error
             expect(result.code).not.toBe(0);
         });
 
