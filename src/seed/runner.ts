@@ -1,4 +1,4 @@
-import { LoadedConfig, ResolvedUser } from '../config.js';
+import { LoadedConfig } from '../config.js';
 import { createAdoClient, createIdentityClient } from '../ado/client.js';
 import { IdentityResolver } from '../ado/identities.js';
 import { RepoManager } from '../ado/repos.js';

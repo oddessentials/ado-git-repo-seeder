@@ -4,7 +4,7 @@
  * IMPORTANT: This test exists because of a bug where localPath cleanup happened
  * BEFORE PR processing completed, causing follow-up pushes to fail with ENOENT.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 describe('Runner cleanup ordering', () => {
     it('documents that PR processing must happen before cleanup', () => {

@@ -11,7 +11,7 @@
  * - Ensures the fix for the needsResolution regression is working
  * - Ensures the fix for conflictResolutionAttempted is working
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 
 /**
  * Interface matching the dependencies used by completePrWithConflictResolution
@@ -107,12 +107,12 @@ async function completePrWithConflictResolution(prId: number, deps: MockDependen
 describe('SeedRunner Integration: completePrWithConflictResolution', () => {
     let resolveConflictsCalls: number;
     let completePrCalls: { commitId: string; options: any }[];
-    let getPrDetailsCalls: number;
+    let _getPrDetailsCalls: number;
 
     beforeEach(() => {
         resolveConflictsCalls = 0;
         completePrCalls = [];
-        getPrDetailsCalls = 0;
+        _getPrDetailsCalls = 0;
     });
 
     describe('Merge Status Handling - REGRESSION TESTS', () => {
@@ -124,7 +124,7 @@ describe('SeedRunner Integration: completePrWithConflictResolution', () => {
         it('should complete PR directly when mergeStatus is "succeeded"', async () => {
             const result = await completePrWithConflictResolution(100, {
                 getPrDetails: async () => {
-                    getPrDetailsCalls++;
+                    _getPrDetailsCalls++;
                     return { mergeStatus: 'succeeded', lastMergeSourceCommit: { commitId: 'abc123' } };
                 },
                 waitForMergeStatusEvaluation: async () => null,
@@ -416,7 +416,7 @@ describe('SeedRunner Integration: completePrWithConflictResolution', () => {
         it('REGRESSION: completePr should NEVER receive empty string', async () => {
             // This documents the critical fix - we should never pass '' to completePr
             // The test simulates what happens when commitId is missing
-            const result = await completePrWithConflictResolution(100, {
+            const _result = await completePrWithConflictResolution(100, {
                 getPrDetails: async () => ({
                     mergeStatus: 'succeeded',
                     lastMergeSourceCommit: undefined, // Missing!

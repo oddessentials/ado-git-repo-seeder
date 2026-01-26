@@ -4,7 +4,7 @@ import { createPlan } from './seed/planner.js';
 import { SeedRunner } from './seed/runner.js';
 import { writeSummary, printSummary, generateMarkdownSummary } from './seed/summary.js';
 import { writeFileSync, readFileSync } from 'node:fs';
-import { resolve, dirname, join } from 'node:path';
+import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 
@@ -59,12 +59,13 @@ function parseArgs(): CliArgs {
             case '-f':
                 result.fixturesPath = args[++i];
                 break;
-            case '--naming':
+            case '--naming': {
                 const naming = args[++i];
                 if (naming === 'isolated' || naming === 'direct') {
                     result.repoNaming = naming;
                 }
                 break;
+            }
             case '--purge-stale':
                 result.purgeStale = true;
                 break;

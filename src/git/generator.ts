@@ -155,8 +155,6 @@ export class GitGenerator {
             for (const branch of branches) {
                 await this.git(localPath, ['push', cleanUrl, branch], true, env);
             }
-        } catch (error) {
-            throw error;
         } finally {
             askPass.cleanup();
         }
