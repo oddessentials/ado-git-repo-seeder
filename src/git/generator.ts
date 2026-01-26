@@ -155,6 +155,11 @@ export class GitGenerator {
             for (const branch of branches) {
                 await this.git(localPath, ['push', cleanUrl, branch], true, env);
             }
+        } catch (error) {
+            // Log error details for debugging before propagating
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            console.error(`❌ Git push failed: ${errorMsg}`);
+            throw error;
         } finally {
             askPass.cleanup();
         }
