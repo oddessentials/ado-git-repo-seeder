@@ -198,7 +198,7 @@ export class PrManager {
     /**
      * Gets policy configurations for a project.
      */
-    async getPolicyConfigurations(project: string): Promise<any[]> {
+    async getPolicyConfigurations(project: string): Promise<unknown[]> {
         const response = await this.client.get(`/${project}/_apis/policy/configurations`, {
             params: { 'api-version': '7.1' },
         });

@@ -7,21 +7,44 @@
  * to throw instead of returning null, breaking repo creation.
  */
 import { describe, it, expect, vi } from 'vitest';
+import { AxiosInstance } from 'axios';
 import { RepoManager } from './repos.js';
+
+/**
+ * Sanitized error format from client.ts sanitizeError()
+ */
+interface SanitizedError extends Error {
+    status?: number;
+}
+
+/**
+ * Raw Axios error format for testing
+ */
+interface RawAxiosError extends Error {
+    response?: { status: number };
+}
+
+/**
+ * Minimal mock client for testing RepoManager
+ */
+interface MockRepoClient {
+    get: ReturnType<typeof vi.fn>;
+    post?: ReturnType<typeof vi.fn>;
+}
 
 describe('RepoManager error handling', () => {
     describe('getRepo handles sanitized errors', () => {
         it('returns null for 404 when error has .status (sanitized error format)', async () => {
             // Simulates the error format from client.ts sanitizeError()
-            const sanitizedError = new Error('Request failed with status code 404');
-            (sanitizedError as any).status = 404;
-            (sanitizedError as any).name = 'AdoApiError';
+            const sanitizedError: SanitizedError = new Error('Request failed with status code 404');
+            sanitizedError.status = 404;
+            sanitizedError.name = 'AdoApiError';
 
-            const mockClient = {
+            const mockClient: MockRepoClient = {
                 get: vi.fn().mockRejectedValue(sanitizedError),
             };
 
-            const repoManager = new RepoManager(mockClient as any);
+            const repoManager = new RepoManager(mockClient as unknown as AxiosInstance);
             const result = await repoManager.getRepo('my-project', 'nonexistent-repo');
 
             expect(result).toBeNull();
@@ -30,28 +53,28 @@ describe('RepoManager error handling', () => {
 
         it('returns null for 404 when error has .response.status (raw axios format)', async () => {
             // Simulates raw axios error before sanitization
-            const axiosError = new Error('Request failed with status code 404');
-            (axiosError as any).response = { status: 404 };
+            const axiosError: RawAxiosError = new Error('Request failed with status code 404');
+            axiosError.response = { status: 404 };
 
-            const mockClient = {
+            const mockClient: MockRepoClient = {
                 get: vi.fn().mockRejectedValue(axiosError),
             };
 
-            const repoManager = new RepoManager(mockClient as any);
+            const repoManager = new RepoManager(mockClient as unknown as AxiosInstance);
             const result = await repoManager.getRepo('my-project', 'nonexistent-repo');
 
             expect(result).toBeNull();
         });
 
         it('throws for non-404 sanitized errors', async () => {
-            const sanitizedError = new Error('Request failed with status code 403');
-            (sanitizedError as any).status = 403;
+            const sanitizedError: SanitizedError = new Error('Request failed with status code 403');
+            sanitizedError.status = 403;
 
-            const mockClient = {
+            const mockClient: MockRepoClient = {
                 get: vi.fn().mockRejectedValue(sanitizedError),
             };
 
-            const repoManager = new RepoManager(mockClient as any);
+            const repoManager = new RepoManager(mockClient as unknown as AxiosInstance);
 
             await expect(repoManager.getRepo('my-project', 'some-repo')).rejects.toThrow(
                 'Request failed with status code 403'
@@ -61,11 +84,11 @@ describe('RepoManager error handling', () => {
         it('throws for errors without status (network errors)', async () => {
             const networkError = new Error('Network Error');
 
-            const mockClient = {
+            const mockClient: MockRepoClient = {
                 get: vi.fn().mockRejectedValue(networkError),
             };
 
-            const repoManager = new RepoManager(mockClient as any);
+            const repoManager = new RepoManager(mockClient as unknown as AxiosInstance);
 
             await expect(repoManager.getRepo('my-project', 'some-repo')).rejects.toThrow('Network Error');
         });
@@ -74,11 +97,11 @@ describe('RepoManager error handling', () => {
     describe('ensureRepo returns isNew flag correctly', () => {
         it('returns isNew: false for existing repos', async () => {
             const existingRepo = { id: 'existing-id', name: 'my-repo', url: '', remoteUrl: '' };
-            const mockClient = {
+            const mockClient: MockRepoClient = {
                 get: vi.fn().mockResolvedValue({ data: existingRepo }),
             };
 
-            const repoManager = new RepoManager(mockClient as any);
+            const repoManager = new RepoManager(mockClient as unknown as AxiosInstance);
             const result = await repoManager.ensureRepo('my-project', 'my-repo', {
                 createIfMissing: true,
                 failIfMissing: false,
@@ -91,16 +114,16 @@ describe('RepoManager error handling', () => {
         });
 
         it('returns isNew: true for newly created repos', async () => {
-            const sanitized404 = new Error('Not found');
-            (sanitized404 as any).status = 404;
+            const sanitized404: SanitizedError = new Error('Not found');
+            sanitized404.status = 404;
 
             const newRepo = { id: 'new-id', name: 'new-repo', url: '', remoteUrl: '' };
-            const mockClient = {
+            const mockClient: MockRepoClient = {
                 get: vi.fn().mockRejectedValue(sanitized404),
                 post: vi.fn().mockResolvedValue({ data: newRepo }),
             };
 
-            const repoManager = new RepoManager(mockClient as any);
+            const repoManager = new RepoManager(mockClient as unknown as AxiosInstance);
             const result = await repoManager.ensureRepo('my-project', 'new-repo', {
                 createIfMissing: true,
                 failIfMissing: false,
@@ -114,11 +137,11 @@ describe('RepoManager error handling', () => {
 
         it('returns null when skipIfExists and repo exists', async () => {
             const existingRepo = { id: 'existing-id', name: 'my-repo', url: '', remoteUrl: '' };
-            const mockClient = {
+            const mockClient: MockRepoClient = {
                 get: vi.fn().mockResolvedValue({ data: existingRepo }),
             };
 
-            const repoManager = new RepoManager(mockClient as any);
+            const repoManager = new RepoManager(mockClient as unknown as AxiosInstance);
             const result = await repoManager.ensureRepo('my-project', 'my-repo', {
                 createIfMissing: false,
                 failIfMissing: false,

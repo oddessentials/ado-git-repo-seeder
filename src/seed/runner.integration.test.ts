@@ -90,8 +90,9 @@ async function completePrWithConflictResolution(prId: number, deps: MockDependen
 
             await deps.completePr(commitId, { bypassPolicy: true });
             return true;
-        } catch (error: any) {
-            const isRetryable = error.status === 409 || error.status === 400;
+        } catch (error: unknown) {
+            const typedError = error as { status?: number };
+            const isRetryable = typedError.status === 409 || typedError.status === 400;
 
             if (isRetryable && attempt < maxRetries - 1) {
                 continue;
@@ -106,7 +107,7 @@ async function completePrWithConflictResolution(prId: number, deps: MockDependen
 
 describe('SeedRunner Integration: completePrWithConflictResolution', () => {
     let resolveConflictsCalls: number;
-    let completePrCalls: { commitId: string; options: any }[];
+    let completePrCalls: { commitId: string; options: { bypassPolicy: boolean } }[];
     let _getPrDetailsCalls: number;
 
     beforeEach(() => {
@@ -426,7 +427,7 @@ describe('SeedRunner Integration: completePrWithConflictResolution', () => {
                 completePr: async (commitId) => {
                     // This should never be called with empty string
                     expect(commitId).not.toBe('');
-                    completePrCalls.push({ commitId, options: {} });
+                    completePrCalls.push({ commitId, options: { bypassPolicy: false } });
                 },
             });
 
@@ -633,7 +634,7 @@ describe('conflictResolutionAttempted Flag Behavior', () => {
 
 describe('Critical Edge Cases', () => {
     let resolveConflictsCalls: number;
-    let completePrCalls: { commitId: string; options: any }[];
+    let completePrCalls: { commitId: string; options: { bypassPolicy: boolean } }[];
 
     beforeEach(() => {
         resolveConflictsCalls = 0;

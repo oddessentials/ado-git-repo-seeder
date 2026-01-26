@@ -5,7 +5,7 @@
  * these tests instantiate the real SeedRunner class with mocked dependencies
  * to get actual line coverage on runner.ts.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import { SeedRunner } from './runner.js';
 import { createPlan } from './planner.js';
 import { loadConfig } from '../config.js';
@@ -21,7 +21,12 @@ vi.mock('axios');
 describe('SeedRunner Actual Code Coverage', () => {
     let tempDir: string;
     let configPath: string;
-    let mockAxiosInstance: any;
+    let mockAxiosInstance: {
+        interceptors: { request: { use: ReturnType<typeof vi.fn> }; response: { use: ReturnType<typeof vi.fn> } };
+        get: ReturnType<typeof vi.fn>;
+        post: ReturnType<typeof vi.fn>;
+        patch: ReturnType<typeof vi.fn>;
+    };
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -50,9 +55,9 @@ describe('SeedRunner Actual Code Coverage', () => {
         process.env.TEST_PAT = 'fake-pat-token';
 
         // Default successful git mock
-        (exec as any).mockImplementation((cmd: string, args: string[], options: any) => {
+        (exec as Mock).mockImplementation((cmd: string, args: string[], options?: { cwd?: string }) => {
             if (args.includes('clone')) {
-                const repoDir = join(options.cwd, 'repo');
+                const repoDir = join(options?.cwd ?? '', 'repo');
                 try {
                     mkdirSync(repoDir, { recursive: true });
                 } catch {}
@@ -188,7 +193,9 @@ describe('SeedRunner Actual Code Coverage', () => {
                 if (lowUrl.includes('pullrequests/') && failComplete) {
                     completePrAttempts++;
                     if (completePrAttempts < 2) {
-                        const error = new Error('Conflict') as any;
+                        const error: Error & { response?: { status: number; data?: { typeKey?: string } } } = new Error(
+                            'Conflict'
+                        );
                         error.response = {
                             status: failCompleteStatus,
                             data: { typeKey: failCompleteTypeKey },
@@ -201,7 +208,7 @@ describe('SeedRunner Actual Code Coverage', () => {
             }),
         };
 
-        (axios.create as any).mockReturnValue(mockAxiosInstance);
+        (axios.create as Mock).mockReturnValue(mockAxiosInstance);
     }
 
     describe('completePrWithConflictResolution via runCleanupMode', () => {

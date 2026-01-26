@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { SeedRunner } from '../seed/runner.js';
 import { createPlan } from '../seed/planner.js';
 import { loadConfig } from '../config.js';
@@ -41,7 +41,7 @@ describe('Multi-Run Robustness (Simulated)', () => {
         process.env.PAT1 = 'fake-pat';
 
         // Mock ADO APIs
-        (axios.create as any).mockReturnValue({
+        (axios.create as Mock).mockReturnValue({
             interceptors: {
                 request: { use: vi.fn() },
                 response: { use: vi.fn() },
@@ -78,7 +78,7 @@ describe('Multi-Run Robustness (Simulated)', () => {
         });
 
         // Mock Git commands
-        (exec as any).mockResolvedValue({ stdout: '', stderr: '', code: 0 });
+        (exec as Mock).mockResolvedValue({ stdout: '', stderr: '', code: 0 });
     });
 
     it('Scenario 1: Accumulation (Run 1 -> Run 2 with unique runIds)', async () => {
@@ -108,7 +108,7 @@ describe('Multi-Run Robustness (Simulated)', () => {
     it('Scenario 2: Fatal Collision (Run 2 re-run with same runId)', async () => {
         // Mock ls-remote to find existing branch for 'run-day-2'
         // Branches are chore/run-day-2-0, feature/run-day-2-1, etc.
-        (exec as any).mockImplementation((cmd: string, args: string[]) => {
+        (exec as Mock).mockImplementation((cmd: string, args: string[]) => {
             if (args.includes('ls-remote')) {
                 return Promise.resolve({
                     stdout: 'hash\trefs/heads/chore/run-day-2-0',

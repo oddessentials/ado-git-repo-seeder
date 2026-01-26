@@ -210,7 +210,9 @@ export class SeedRunner {
                                 repoName,
                                 remoteUrl: repo.remoteUrl,
                                 pr,
-                                createdDate: new Date((pr as any).creationDate || 0),
+                                createdDate: new Date(
+                                    (pr as PullRequest & { creationDate?: string }).creationDate || '1970-01-01'
+                                ),
                             });
                         }
                     }
@@ -235,7 +237,7 @@ export class SeedRunner {
             const prTitle = pr.title.length > 50 ? pr.title.slice(0, 47) + '...' : pr.title;
 
             try {
-                if ((pr as any).isDraft) {
+                if ((pr as PullRequest & { isDraft?: boolean }).isDraft) {
                     console.log(`   📝 Publishing draft PR #${pr.pullRequestId}: ${prTitle}`);
                     await this.prManager.publishDraft(project, repoId, pr.pullRequestId);
                     stats.draftsPublished++;
@@ -290,22 +292,25 @@ export class SeedRunner {
         const projects = [...new Set(this.plan.repos.map((r) => r.project))];
         console.log('🔍 Preflight: Checking for branch policies...');
 
+        // Type for ADO policy configuration
+        type PolicyConfig = { isEnabled?: boolean; isDeleted?: boolean; type?: { displayName?: string } };
+
         for (const project of projects) {
             try {
                 const policies = await this.prManager.getPolicyConfigurations(project);
-                const dangerousPolicies = policies.filter(
+                const dangerousPolicies = (policies as PolicyConfig[]).filter(
                     (p) =>
                         p.isEnabled &&
                         !p.isDeleted &&
                         ['Minimum reviewer count', 'Required reviewers', 'Check for merge conflicts'].includes(
-                            p.type.displayName
+                            p.type?.displayName ?? ''
                         )
                 );
 
                 if (dangerousPolicies.length > 0) {
                     console.warn(`\n⚠️  [POLICY WARNING] Active branch policies detected in project '${project}':`);
                     for (const p of dangerousPolicies) {
-                        console.warn(`   - ${p.type.displayName}`);
+                        console.warn(`   - ${p.type?.displayName ?? 'Unknown policy'}`);
                     }
                     console.warn(`   These may block automated PR completion if criteria aren't met.\n`);
                 }
@@ -404,7 +409,7 @@ export class SeedRunner {
 
     private async processPr(
         project: string,
-        repo: any, // AdoRepo
+        repo: { id: string; name: string; remoteUrl: string }, // AdoRepo shape
         planned: PlannedPr,
         failures: FailureRecord[],
         localPath?: string
@@ -793,10 +798,16 @@ export class SeedRunner {
 
                 console.log(`   ✅ PR #${prId} successfully completed and verified`);
                 return true;
-            } catch (error: any) {
-                const adoData = error?.response?.data ?? error?.data;
+            } catch (error: unknown) {
+                const typedError = error as {
+                    response?: { data?: { typeKey?: string }; status?: number };
+                    data?: { typeKey?: string };
+                    status?: number;
+                    message?: string;
+                };
+                const adoData = typedError?.response?.data ?? typedError?.data;
                 const isStaleException = adoData?.typeKey === 'GitPullRequestStaleException';
-                const statusCode = error?.status ?? error?.response?.status;
+                const statusCode = typedError?.status ?? typedError?.response?.status;
 
                 // TF401192: source modified since last merge attempt.
                 // Fix: refetch PR and retry completion; DO NOT resolve again (that creates more commits and loops staleness).

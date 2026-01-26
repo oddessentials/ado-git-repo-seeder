@@ -7,6 +7,39 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import axios from 'axios';
 import { createAdoClient, createIdentityClient } from './client.js';
 
+/**
+ * Type-safe interceptor handler interface for testing response interceptors.
+ * Uses generic response/error types to accommodate test mock flexibility.
+ */
+interface MockResponseInterceptor {
+    success: (response: Record<string, unknown>) => Record<string, unknown>;
+    error: (error: MockAxiosError) => Promise<Record<string, unknown>>;
+}
+
+/**
+ * Mock request config with retry tracking support.
+ * Using Record type for headers to avoid strict AxiosHeaders requirements in tests.
+ */
+interface MockRequestConfig {
+    headers?: Record<string, string>;
+    _retryCount?: number;
+    _redactedAuth?: boolean;
+}
+
+/**
+ * Mock error structure matching Axios error shape for testing.
+ */
+interface MockAxiosError {
+    config?: MockRequestConfig;
+    message: string;
+    response?: {
+        status: number;
+        data?: unknown;
+    };
+}
+
+// MockAxiosClient removed - using inline mock structures with unknown casts
+
 // Mock axios.create
 vi.mock('axios', () => ({
     default: {
@@ -85,7 +118,7 @@ describe('ADO Client Factory', () => {
                     response: { use: vi.fn() },
                 },
             };
-            vi.mocked(axios.create).mockReturnValue(mockClient as any);
+            vi.mocked(axios.create).mockReturnValue(mockClient as unknown as ReturnType<typeof axios.create>);
 
             createAdoClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
 
@@ -118,7 +151,7 @@ describe('ADO Client Factory', () => {
                     response: { use: vi.fn() },
                 },
             };
-            vi.mocked(axios.create).mockReturnValue(mockClient as any);
+            vi.mocked(axios.create).mockReturnValue(mockClient as unknown as ReturnType<typeof axios.create>);
 
             createIdentityClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
 
@@ -128,7 +161,7 @@ describe('ADO Client Factory', () => {
 
     describe('Interceptor behavior', () => {
         it('request interceptor marks Authorization header as redacted', () => {
-            let requestInterceptor: ((config: any) => any) | null = null;
+            let requestInterceptor: ((config: MockRequestConfig) => MockRequestConfig) | null = null;
             const mockClient = {
                 interceptors: {
                     request: {
@@ -139,7 +172,7 @@ describe('ADO Client Factory', () => {
                     response: { use: vi.fn() },
                 },
             };
-            vi.mocked(axios.create).mockReturnValue(mockClient as any);
+            vi.mocked(axios.create).mockReturnValue(mockClient as unknown as ReturnType<typeof axios.create>);
 
             createAdoClient({ org: 'org', pat: 'secret-pat', allPats: ['secret-pat'] });
 
@@ -152,7 +185,7 @@ describe('ADO Client Factory', () => {
         });
 
         it('request interceptor handles missing Authorization header', () => {
-            let requestInterceptor: ((config: any) => any) | null = null;
+            let requestInterceptor: ((config: MockRequestConfig) => MockRequestConfig) | null = null;
             const mockClient = {
                 interceptors: {
                     request: {
@@ -163,7 +196,7 @@ describe('ADO Client Factory', () => {
                     response: { use: vi.fn() },
                 },
             };
-            vi.mocked(axios.create).mockReturnValue(mockClient as any);
+            vi.mocked(axios.create).mockReturnValue(mockClient as unknown as ReturnType<typeof axios.create>);
 
             createAdoClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
 
@@ -174,7 +207,7 @@ describe('ADO Client Factory', () => {
         });
 
         it('response interceptor passes successful responses through', async () => {
-            let responseInterceptor: { success: (r: any) => any; error: (e: any) => any } | null = null;
+            let responseInterceptor: MockResponseInterceptor | null = null;
             const mockClient = {
                 interceptors: {
                     request: { use: vi.fn() },
@@ -185,7 +218,7 @@ describe('ADO Client Factory', () => {
                     },
                 },
             };
-            vi.mocked(axios.create).mockReturnValue(mockClient as any);
+            vi.mocked(axios.create).mockReturnValue(mockClient as unknown as ReturnType<typeof axios.create>);
 
             createAdoClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
 
@@ -195,7 +228,7 @@ describe('ADO Client Factory', () => {
         });
 
         it('response interceptor sanitizes errors and redacts PAT', async () => {
-            let responseInterceptor: { success: (r: any) => any; error: (e: any) => Promise<any> } | null = null;
+            let responseInterceptor: MockResponseInterceptor | null = null;
             const mockClient = {
                 interceptors: {
                     request: { use: vi.fn() },
@@ -206,7 +239,7 @@ describe('ADO Client Factory', () => {
                     },
                 },
             };
-            vi.mocked(axios.create).mockReturnValue(mockClient as any);
+            vi.mocked(axios.create).mockReturnValue(mockClient as unknown as ReturnType<typeof axios.create>);
 
             const secretPat = 'super-secret-pat-12345';
             createAdoClient({ org: 'org', pat: secretPat, allPats: [secretPat] });
@@ -224,7 +257,7 @@ describe('ADO Client Factory', () => {
         });
 
         it('response interceptor throws sanitized error for 4xx errors (non-retryable)', async () => {
-            let responseInterceptor: { success: (r: any) => any; error: (e: any) => Promise<any> } | null = null;
+            let responseInterceptor: MockResponseInterceptor | null = null;
             const mockClient = {
                 interceptors: {
                     request: { use: vi.fn() },
@@ -235,7 +268,7 @@ describe('ADO Client Factory', () => {
                     },
                 },
             };
-            vi.mocked(axios.create).mockReturnValue(mockClient as any);
+            vi.mocked(axios.create).mockReturnValue(mockClient as unknown as ReturnType<typeof axios.create>);
 
             createAdoClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
 
@@ -253,7 +286,7 @@ describe('ADO Client Factory', () => {
         });
 
         it('response interceptor includes response data in sanitized error', async () => {
-            let responseInterceptor: { success: (r: any) => any; error: (e: any) => Promise<any> } | null = null;
+            let responseInterceptor: MockResponseInterceptor | null = null;
             const mockClient = {
                 interceptors: {
                     request: { use: vi.fn() },
@@ -264,7 +297,7 @@ describe('ADO Client Factory', () => {
                     },
                 },
             };
-            vi.mocked(axios.create).mockReturnValue(mockClient as any);
+            vi.mocked(axios.create).mockReturnValue(mockClient as unknown as ReturnType<typeof axios.create>);
 
             createAdoClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
 
@@ -281,11 +314,97 @@ describe('ADO Client Factory', () => {
                 data: { typeKey: 'GitRepositoryNotFoundError' },
             });
         });
-    });
 
-    describe('Identity client interceptors', () => {
-        it('response interceptor sanitizes errors for identity client', async () => {
-            let responseInterceptor: { success: (r: any) => any; error: (e: any) => Promise<any> } | null = null;
+        it('response interceptor retries on 500 Internal Server Error', async () => {
+            let responseInterceptor: MockResponseInterceptor | null = null;
+            const mockRequest = vi.fn().mockResolvedValue({ data: 'success', status: 200 });
+            const mockClient = {
+                interceptors: {
+                    request: { use: vi.fn() },
+                    response: {
+                        use: vi.fn((success, error) => {
+                            responseInterceptor = { success, error };
+                        }),
+                    },
+                },
+                request: mockRequest,
+            };
+            vi.mocked(axios.create).mockReturnValue(mockClient as unknown as ReturnType<typeof axios.create>);
+
+            createAdoClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
+
+            const serverError = {
+                config: { _retryCount: 0 },
+                message: 'Internal Server Error',
+                response: { status: 500, data: { error: 'Server error' } },
+            };
+
+            // Retry should be triggered - the interceptor calls client.request
+            const result = await responseInterceptor!.error(serverError);
+            expect(mockRequest).toHaveBeenCalledTimes(1);
+            expect(result).toEqual({ data: 'success', status: 200 });
+        });
+
+        it('response interceptor retries on 502 Bad Gateway', async () => {
+            let responseInterceptor: MockResponseInterceptor | null = null;
+            const mockRequest = vi.fn().mockResolvedValue({ data: 'recovered', status: 200 });
+            const mockClient = {
+                interceptors: {
+                    request: { use: vi.fn() },
+                    response: {
+                        use: vi.fn((success, error) => {
+                            responseInterceptor = { success, error };
+                        }),
+                    },
+                },
+                request: mockRequest,
+            };
+            vi.mocked(axios.create).mockReturnValue(mockClient as unknown as ReturnType<typeof axios.create>);
+
+            createAdoClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
+
+            const gatewayError = {
+                config: { _retryCount: 0 },
+                message: 'Bad Gateway',
+                response: { status: 502, data: {} },
+            };
+
+            const result = await responseInterceptor!.error(gatewayError);
+            expect(mockRequest).toHaveBeenCalledTimes(1);
+            expect(result).toEqual({ data: 'recovered', status: 200 });
+        });
+
+        it('response interceptor retries on 503 Service Unavailable', async () => {
+            let responseInterceptor: MockResponseInterceptor | null = null;
+            const mockRequest = vi.fn().mockResolvedValue({ data: 'available', status: 200 });
+            const mockClient = {
+                interceptors: {
+                    request: { use: vi.fn() },
+                    response: {
+                        use: vi.fn((success, error) => {
+                            responseInterceptor = { success, error };
+                        }),
+                    },
+                },
+                request: mockRequest,
+            };
+            vi.mocked(axios.create).mockReturnValue(mockClient as unknown as ReturnType<typeof axios.create>);
+
+            createAdoClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
+
+            const unavailableError = {
+                config: { _retryCount: 0 },
+                message: 'Service Unavailable',
+                response: { status: 503, data: {} },
+            };
+
+            const result = await responseInterceptor!.error(unavailableError);
+            expect(mockRequest).toHaveBeenCalledTimes(1);
+            expect(result).toEqual({ data: 'available', status: 200 });
+        });
+
+        it('response interceptor exhausts retries after MAX_RETRIES on 5xx', async () => {
+            let responseInterceptor: MockResponseInterceptor | null = null;
             const mockClient = {
                 interceptors: {
                     request: { use: vi.fn() },
@@ -296,7 +415,97 @@ describe('ADO Client Factory', () => {
                     },
                 },
             };
-            vi.mocked(axios.create).mockReturnValue(mockClient as any);
+            vi.mocked(axios.create).mockReturnValue(mockClient as unknown as ReturnType<typeof axios.create>);
+
+            createAdoClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
+
+            // Simulate error after MAX_RETRIES (3) have been exhausted
+            const exhaustedError = {
+                config: { _retryCount: 3 },
+                message: 'Server Error',
+                response: { status: 500, data: { error: 'Persistent failure' } },
+            };
+
+            await expect(responseInterceptor!.error(exhaustedError)).rejects.toMatchObject({
+                name: 'AdoApiError',
+                status: 500,
+            });
+        });
+
+        it('response interceptor retries on 429 rate limit', async () => {
+            let responseInterceptor: MockResponseInterceptor | null = null;
+            const mockRequest = vi.fn().mockResolvedValue({ data: 'rate-limit-cleared', status: 200 });
+            const mockClient = {
+                interceptors: {
+                    request: { use: vi.fn() },
+                    response: {
+                        use: vi.fn((success, error) => {
+                            responseInterceptor = { success, error };
+                        }),
+                    },
+                },
+                request: mockRequest,
+            };
+            vi.mocked(axios.create).mockReturnValue(mockClient as unknown as ReturnType<typeof axios.create>);
+
+            createAdoClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
+
+            const rateLimitError = {
+                config: { _retryCount: 0 },
+                message: 'Too Many Requests',
+                response: { status: 429, data: { retryAfter: 1 } },
+            };
+
+            const result = await responseInterceptor!.error(rateLimitError);
+            expect(mockRequest).toHaveBeenCalledTimes(1);
+            expect(result).toEqual({ data: 'rate-limit-cleared', status: 200 });
+        });
+
+        it('response interceptor increments retry count on each attempt', async () => {
+            let responseInterceptor: MockResponseInterceptor | null = null;
+            const mockRequest = vi.fn().mockResolvedValue({ data: 'ok', status: 200 });
+            const mockClient = {
+                interceptors: {
+                    request: { use: vi.fn() },
+                    response: {
+                        use: vi.fn((success, error) => {
+                            responseInterceptor = { success, error };
+                        }),
+                    },
+                },
+                request: mockRequest,
+            };
+            vi.mocked(axios.create).mockReturnValue(mockClient as unknown as ReturnType<typeof axios.create>);
+
+            createAdoClient({ org: 'org', pat: 'pat', allPats: ['pat'] });
+
+            const serverError = {
+                config: { _retryCount: 1 },
+                message: 'Server Error',
+                response: { status: 500, data: {} },
+            };
+
+            await responseInterceptor!.error(serverError);
+
+            // Verify the config was passed with incremented retry count
+            expect(mockRequest).toHaveBeenCalledWith(expect.objectContaining({ _retryCount: 2 }));
+        });
+    });
+
+    describe('Identity client interceptors', () => {
+        it('response interceptor sanitizes errors for identity client', async () => {
+            let responseInterceptor: MockResponseInterceptor | null = null;
+            const mockClient = {
+                interceptors: {
+                    request: { use: vi.fn() },
+                    response: {
+                        use: vi.fn((success, error) => {
+                            responseInterceptor = { success, error };
+                        }),
+                    },
+                },
+            };
+            vi.mocked(axios.create).mockReturnValue(mockClient as unknown as ReturnType<typeof axios.create>);
 
             const secretPat = 'identity-secret-pat';
             createIdentityClient({ org: 'org', pat: secretPat, allPats: [secretPat] });
