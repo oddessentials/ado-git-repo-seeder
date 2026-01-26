@@ -1,1 +1,1 @@
-npm run format:check && npm test
+npm run format:check && npm run lint:strict && npx tsc --noEmit && npm test

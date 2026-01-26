@@ -17,6 +17,7 @@ module.exports = {
     rules: {
         'no-unused-vars': 'off', // TypeScript handles this
         '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+        '@typescript-eslint/no-explicit-any': 'warn', // Flag any usage as tech debt
         'no-console': 'off',
         'no-empty': ['error', { allowEmptyCatch: true }],
         'no-case-declarations': 'warn',
