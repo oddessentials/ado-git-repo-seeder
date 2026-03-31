@@ -7,7 +7,7 @@ on:
     - cron: '45 14 * * 1-5'
     - cron: '30 20 * * 1-5'
     # Weekend cadence (lower activity)
-    - cron: '0 10 * * *'
+    - cron: '0 10 * * 0,6'
   workflow_dispatch: # Allow manual trigger
 
 concurrency:
@@ -38,8 +38,8 @@ jobs:
           DOW="$(date -u +'%u')"
           HOUR="$(date -u +'%H')"
           RND="$((RANDOM % 100))"
-          # On weekends, skip 60% of scheduled runs to reduce robotic uniformity.
-          if [ "$DOW" -ge 6 ] && [ "$RND" -lt 60 ]; then
+          # On scheduled weekend runs, skip 60% to reduce robotic uniformity.
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$DOW" -ge 6 ] && [ "$RND" -lt 60 ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
             echo "run_id=skip-$(date -u +'%Y%m%d-%H%M')" >> $GITHUB_OUTPUT
             echo "target_date=$(date -u +'%Y-%m-%d')" >> $GITHUB_OUTPUT
@@ -65,7 +65,7 @@ jobs:
 
       - name: Note skipped run
         if: steps.runid.outputs.skip == 'true'
-        run: echo "Weekend run intentionally skipped to preserve realistic activity variance."
+        run: echo "Scheduled weekend run intentionally skipped to preserve realistic activity variance."
 
       - name: Upload Summary
         uses: actions/upload-artifact@v4
