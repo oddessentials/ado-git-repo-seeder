@@ -24,12 +24,20 @@ export class GitGenerator {
     private rng: SeededRng;
     private patsToRedact: string[];
     private targetDate?: string; // ISO timestamp for backdating commits
+    private commitAuthors: string[];
 
-    constructor(rng: SeededRng, fixturesPath?: string, patsToRedact: string[] = [], targetDate?: string) {
+    constructor(
+        rng: SeededRng,
+        fixturesPath?: string,
+        patsToRedact: string[] = [],
+        targetDate?: string,
+        commitAuthors: string[] = []
+    ) {
         this.rng = rng;
         this.deriver = new ContentDeriver(rng, fixturesPath);
         this.patsToRedact = patsToRedact;
         this.targetDate = targetDate;
+        this.commitAuthors = commitAuthors;
     }
 
     /**
@@ -67,7 +75,7 @@ export class GitGenerator {
             // Create initial commit on main
             writeFileSync(join(actualTempDir, 'README.md'), `# ${repoName}\n\nSeeded repository.`);
             await this.git(actualTempDir, ['add', '.']);
-            await this.git(actualTempDir, ['commit', '-m', 'Initial commit']);
+            await this.git(actualTempDir, this.createCommitArgs('Initial commit', this.rng));
             await this.git(actualTempDir, ['branch', '-M', 'main']);
 
             // Create branches
@@ -94,7 +102,7 @@ export class GitGenerator {
                         writeFileSync(filePath, file.content);
                     }
                     await this.git(actualTempDir, ['add', '.']);
-                    await this.git(actualTempDir, ['commit', '-m', `${branch.name}: commit ${i + 1}`]);
+                    await this.git(actualTempDir, this.createCommitArgs(`${branch.name}: commit ${i + 1}`, commitRng));
                 }
 
                 createdBranches.push(branch.name);
@@ -193,7 +201,7 @@ export class GitGenerator {
                 writeFileSync(filePath, file.content);
             }
             await this.git(localPath, ['add', '.']);
-            await this.git(localPath, ['commit', '-m', `Follow-up: addressing feedback ${i + 1}`]);
+            await this.git(localPath, this.createCommitArgs(`Follow-up: addressing feedback ${i + 1}`, commitRng));
         }
 
         const url = new URL(remoteUrl);
@@ -210,6 +218,33 @@ export class GitGenerator {
             askPass.cleanup();
         }
         return { count: commitCount };
+    }
+
+    private createCommitArgs(message: string, rng: SeededRng): string[] {
+        const args = ['commit', '-m', message];
+        const author = this.pickCommitAuthor(rng);
+        if (author) {
+            args.push('--author', author);
+        }
+        return args;
+    }
+
+    private pickCommitAuthor(rng: SeededRng): string | null {
+        if (this.commitAuthors.length === 0) {
+            return null;
+        }
+        const email = rng.pick(this.commitAuthors);
+        const namePart = email
+            .split('@')[0]
+            .replace(/[._-]+/g, ' ')
+            .trim();
+        const displayName = namePart
+            .split(/\s+/)
+            .filter((token) => token.length > 0)
+            .map((token) => token[0].toUpperCase() + token.slice(1))
+            .join(' ');
+        const fallbackName = 'Seeder User';
+        return `${displayName || fallbackName} <${email}>`;
     }
 
     /**

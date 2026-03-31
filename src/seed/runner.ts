@@ -68,7 +68,13 @@ export class SeedRunner {
         this.identityResolver = new IdentityResolver(this.identityClient, config.org);
         this.repoManager = new RepoManager(this.adoClient);
         this.prManager = new PrManager(this.adoClient);
-        this.gitGenerator = new GitGenerator(new SeededRng(config.seed), fixturesPath, this.allPats, targetDate);
+        this.gitGenerator = new GitGenerator(
+            new SeededRng(config.seed),
+            fixturesPath,
+            this.allPats,
+            targetDate,
+            config.resolvedUsers.map((user) => user.email)
+        );
 
         // Create per-user clients
         for (const user of config.resolvedUsers) {
